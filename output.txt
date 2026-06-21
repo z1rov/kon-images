@@ -1,0 +1,1209 @@
+===== ./assets/zshrc-kon =====
+#!/usr/bin/env zsh
+# KON ZSH configuration
+export ZSH_DISABLE_COMPFIX=true
+export ZSH="/root/.oh-my-zsh"
+ZSH_THEME=""
+plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
+source "$ZSH/oh-my-zsh.sh"
+
+# Git branch info en el prompt — en amarillo
+autoload -Uz vcs_info
+zstyle ':vcs_info:*' enable git
+zstyle ':vcs_info:git:*' formats '%F{yellow} [%b]%f'
+zstyle ':vcs_info:git:*' actionformats '%F{yellow} [%b|%a]%f'
+precmd_functions+=(vcs_info)
+
+# Prompt
+PS1="%F{#FF0000}%B[%b%F{#FF0000}%n %F{#FF0000}✘%f%F{#FF0000} %m%F{#FF0000}%B]-%B[%b%F{white}%~%F{#FF0000}%B]%b\${vcs_info_msg_0_}
+%F{#FF0000}%B\$%b%f "
+
+# ls colors
+LS_COLORS="di=38;2;255;200;80:fi=38;2;220;220;220:ex=38;2;255;180;60:ln=38;2;120;200;255:so=38;2;180;140;255:bd=38;2;255;120;120:cd=38;2;255;160;80"
+export LS_COLORS
+
+typeset -A ZSH_HIGHLIGHT_STYLES
+ZSH_HIGHLIGHT_STYLES[command]='fg=#00FFFF,bold'
+ZSH_HIGHLIGHT_STYLES[builtin]='fg=#00FFFF,bold'
+ZSH_HIGHLIGHT_STYLES[function]='fg=#00FFFF,bold'
+ZSH_HIGHLIGHT_STYLES[alias]='fg=#00FFFF,bold'
+ZSH_HIGHLIGHT_STYLES[hashed-command]='fg=#00FFFF,bold'
+ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=red,bold'
+
+# Aliases
+alias ll='ls -lahF --color=auto'
+alias la='ls -la --color=auto'
+alias ls='ls --color=auto'
+
+# cd sin argumentos va a /anvil
+alias cd='cd_func() { if [[ $# -eq 0 ]]; then cd /anvil; else builtin cd "$@"; fi; }; cd_func'
+
+# History
+HISTSIZE=10000
+SAVEHIST=10000
+setopt INC_APPEND_HISTORY
+
+# Autocomplete improvements
+setopt COMPLETE_IN_WORD
+setopt ALWAYS_TO_END
+unsetopt FLOW_CONTROL
+
+# Directorio por defecto al iniciar
+cd /anvil 2>/dev/null
+
+
+===== ./assets/aliases.sh =====
+#!/usr/bin/env bash
+
+# --- Navegación ---
+alias anvil='cd /anvil'
+alias projects='cd /anvil/projects'
+alias loot='cd /anvil/loot'
+alias wordlists='cd /usr/share/wordlists'
+alias rules='cd /usr/share/rules'
+
+# --- /opt/tools ---
+alias tools='cd /opt/tools'
+alias tbin='cd /opt/tools/bin'
+alias tsrc='cd /opt/tools/src'
+alias forja='cd /opt/tools/forja'
+
+# --- Acceso directo a herramientas en forja/ (binarios sueltos, ej. mimikatz 32/64) ---
+# Escribes el nombre y te lleva directo a su carpeta dentro de forja/.
+alias mimikatz='cd /opt/tools/forja/mimikatz'
+
+# --- Red ---
+alias myip='ip -4 addr show | grep inet | awk "{print \$2}"'
+alias vpnip='ip -4 addr show tun0 2>/dev/null | awk "/inet /{print \$2}" || echo "no vpn"'
+alias ifaces='ip -brief link show'
+
+# --- Utilidades ---
+alias ll='ls -lahF --color=auto'
+alias la='ls -la --color=auto'
+alias grep='grep --color=auto'
+alias cls='clear'
+
+# --- KON ---
+alias kon-tools='ls /opt/tools/bin/'
+
+# --- Prompt ---
+export PS1='\[\033[0;36m\][KON:] \[\033[1;32m\]\w\[\033[0m\] # '
+
+# --- Fix de HOME ---
+export HOME=/root
+cd /anvil 2>/dev/null || cd /root
+
+
+===== ./runtime/init.sh =====
+#!/usr/bin/env bash
+
+KON_HOME="/kon"
+
+if [[ -f "${KON_HOME}/runtime/workspace.sh" ]]; then
+    source "${KON_HOME}/runtime/workspace.sh" || true
+fi
+
+
+# Copiar config de ZSH
+if [[ -f "${KON_HOME}/assets/zshrc-kon" ]]; then
+    cp "${KON_HOME}/assets/zshrc-kon" /root/.zshrc
+fi
+
+# Iniciar ZSH
+exec /bin/zsh --login -i
+
+
+===== ./runtime/workspace.sh =====
+#!/usr/bin/env bash
+
+ANVIL="${KON_ANVIL:-/anvil}"
+
+# Crear directorios del workspace
+mkdir -p "${ANVIL}"/
+
+# Estructura canónica de herramientas (debe existir incluso si las
+# capas de instalación están desactivadas en el Dockerfile)
+mkdir -p /opt/tools/bin /opt/tools/src /opt/tools/forja
+mkdir -p /usr/share/wordlists /usr/share/rules
+
+# Cargar aliases en bash
+if [[ -f "/kon/assets/aliases.sh" ]]; then
+    grep -qxF "source /kon/assets/aliases.sh" /root/.bashrc 2>/dev/null || \
+        echo "source /kon/assets/aliases.sh" >> /root/.bashrc
+fi
+
+
+===== ./Dockerfile =====
+FROM debian:bookworm-slim
+
+# ── Environment ─────────────────────────────────────────────────────────
+ENV DEBIAN_FRONTEND=noninteractive \
+    KON_HOME=/kon \
+    KON_ANVIL=/anvil \
+    TERM=xterm-256color \
+    SHELL=/bin/bash \
+    LANG=en_US.UTF-8 \
+    GOPATH="/root/go" \
+    PATH="${PATH}:/usr/local/go/bin:/root/go/bin:/opt/tools/bin:/usr/local/bin"
+
+# ── [L1] Base APT packages ──────────────────────────────────────────────
+# Changes rarely. If it changes, everything rebuilds — acceptable.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash ca-certificates curl wget git gnupg locate\
+    python3 python3-pip iproute2 iputils-ping nano\
+    dnsutils net-tools procps locales tzdata ntpdate\
+    less vim sudo openssh-client \
+    build-essential gcc libssl-dev libffi-dev \
+    python3-dev \
+    krb5-config libkrb5-dev libldap2-dev libsasl2-dev \
+    samba-common-bin \
+    && locale-gen en_US.UTF-8 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ── [L2] Official Go 1.23.5 ─────────────────────────────────────────────
+# Separated from APT: if Go is updated, the APT packages are not reinstalled.
+RUN set -e; \
+    GO_VERSION="1.23.5"; \
+    ARCH=$(uname -m); \
+    case "${ARCH}" in \
+        x86_64)  GOARCH="amd64" ;; \
+        aarch64) GOARCH="arm64" ;; \
+        *)       echo "Unsupported arch: ${ARCH}"; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${GOARCH}.tar.gz" \
+        -o /tmp/go.tar.gz; \
+    rm -rf /usr/local/go; \
+    tar -C /usr/local -xzf /tmp/go.tar.gz; \
+    rm /tmp/go.tar.gz; \
+    /usr/local/go/bin/go version
+
+# ── [L3] ZSH and shell tooling ──────────────────────────────────────────
+# Separated: adjusting the shell should not invalidate Go or base APT.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    zsh zsh-syntax-highlighting zsh-autosuggestions fzf \
+    powerline fonts-powerline \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ── [L4] Oh My ZSH and plugins ───────────────────────────────────────────
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended && \
+    git clone https://github.com/zsh-users/zsh-autosuggestions \
+        ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions && \
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git \
+        ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+
+# ── [L5] common.sh ───────────────────────────────────────────────────────
+# CRITICAL: it is a dependency of every package_*.sh.
+# Being the first one copied, any change to it invalidates everything after it.
+# Keeping it stable is the key to the entire granular cache scheme.
+COPY install/common.sh /kon/install/common.sh
+RUN chmod +x /kon/install/common.sh
+
+# ── [L6] package_recon ───────────────────────────────────────────────────
+COPY install/package_recon.sh /kon/install/package_recon.sh
+RUN chmod +x /kon/install/package_recon.sh && \
+   apt-get update && \
+   bash -c 'source /kon/install/common.sh && \
+            source /kon/install/package_recon.sh && \
+            package_recon' && \
+   apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ── [L7] package_wordlists (DESACTIVADO) ─────────────────────────────────
+# More stable: wordlists do not change frequently.
+# Placed first among the packages to maximize cache hits.
+COPY install/package_wordlists.sh /kon/install/package_wordlists.sh
+RUN chmod +x /kon/install/package_wordlists.sh && \
+    apt-get update && \
+    bash -c 'source /kon/install/common.sh && \
+             source /kon/install/package_wordlists.sh && \
+             package_wordlists' && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ── [L8] package_ad (DESACTIVADO) ────────────────────────────────────────
+# AD tools: stable, but more complex than wordlists.
+COPY install/package_ad.sh /kon/install/package_ad.sh
+RUN chmod +x /kon/install/package_ad.sh && \
+    apt-get update && \
+    bash -c 'source /kon/install/common.sh && \
+              source /kon/install/package_ad.sh && \
+             package_ad' && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ── [L9] package_infra (DESACTIVADO) ─────────────────────────────────────
+# Placed last among the packages because it is the one you actively change the most.
+# Changing infra only invalidates this layer and assets/runtime L10-L12.
+COPY install/package_infra.sh /kon/install/package_infra.sh
+RUN chmod +x /kon/install/package_infra.sh && \
+     apt-get update && \
+     bash -c 'source /kon/install/common.sh && \
+              source /kon/install/package_infra.sh && \
+              package_infra' && \
+     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+
+
+# ── [L10] package_web commented out, structure ready to activate ────────
+COPY install/package_web.sh /kon/install/package_web.sh
+RUN chmod +x /kon/install/package_web.sh && \
+     apt-get update && \
+     bash -c 'source /kon/install/common.sh && \
+              source /kon/install/package_web.sh && \
+              package_web' && \
+     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+
+# ── [L11] Assets ──────────────────────────────────────────────────────────
+# Separated from install/: changing an alias or the banner does not touch any package.
+COPY assets/ /kon/assets/
+COPY version/ /kon/version/
+
+# ── [L12] Runtime and ZSH config ─────────────────────────────────────────
+# The most volatile part: startup scripts and shell configuration.
+# By going last, any runtime adjustment does not invalidate any tool layer.
+COPY runtime/ /kon/runtime/
+COPY assets/zshrc-kon /root/.zshrc
+ENV PATH="${PATH}:/root/.local/bin"
+
+# ── [L13] Final permissions and directory structure ─────────────────────
+RUN find /kon -name "*.sh" -exec chmod +x {} \; && \
+    mkdir -p /anvil /opt/tools/bin /opt/tools/src /opt/tools/forja \
+             /usr/share/wordlists /usr/share/rules
+
+WORKDIR /anvil
+ENTRYPOINT ["/kon/runtime/init.sh"]
+
+
+===== ./version/version.txt =====
+1.0
+
+
+===== ./install/common.sh =====
+#!/usr/bin/env bash
+
+GREEN='\033[0;32m'; RED='\033[0;31m'; CYAN='\033[0;36m'; DIM='\033[2m'; RESET='\033[0m'
+
+KON_TOOLS="/opt/tools"
+KON_BIN="${KON_TOOLS}/bin"
+KON_SRC="${KON_TOOLS}/src"
+KON_FORJA="${KON_TOOLS}/forja"
+
+mkdir -p "${KON_BIN}" "${KON_SRC}" "${KON_FORJA}"
+
+_ok()  { echo -e "  ${GREEN}[OK]${RESET}    ${DIM}$1${RESET}"; }
+_err() { echo -e "  ${RED}[ERROR]${RESET} $1"; }
+_info(){ echo -e "  ${CYAN}[INFO]${RESET}  $1"; }
+
+install_apt() {
+    apt-get install -y --no-install-recommends "$1" >/dev/null 2>&1 \
+        && _ok "apt: $1" || _err "apt: $1"
+}
+
+install_pip() {
+    pip3 install -q --no-cache-dir --break-system-packages "$1" >/dev/null 2>&1 \
+        && _ok "pip: $1" || _err "pip: $1"
+}
+
+install_go() {
+    go install "$2" >/dev/null 2>&1 || { _err "go:  $1"; return 1; }
+    local gobin="${GOPATH:-/root/go}/bin/$1"
+    if [[ -f "${gobin}" ]]; then
+        ln -sf "${gobin}" "${KON_BIN}/$1"
+    fi
+    _ok "go:  $1 → ${KON_BIN}/$1"
+}
+
+install_git() {
+    local dest="${KON_SRC}/$1"
+    if [[ -d "${dest}" ]]; then
+        _info "skip: $1 (already exists)"
+        return
+    fi
+    git clone -q --depth 1 "$2" "${dest}" >/dev/null 2>&1 \
+        && _ok "git: $1 → ${dest}" || _err "git: $1"
+}
+
+link_bin() {
+    local name="$1" target="$2"
+    if [[ -f "${target}" ]]; then
+        ln -sf "${target}" "${KON_BIN}/${name}"
+        chmod +x "${target}" 2>/dev/null || true
+        _ok "bin: ${name} → ${KON_BIN}/${name}"
+    else
+        _err "link_bin: ${target} no existe"
+    fi
+}
+
+forja_get() {
+    local grupo="$1" url="$2" fname="${3:-$(basename "$url")}"
+    local dest_dir="${KON_FORJA}/${grupo}"
+    mkdir -p "${dest_dir}"
+    curl -sL "${url}" -o "${dest_dir}/${fname}" \
+        && _ok "forja: ${grupo}/${fname}" || _err "forja: ${grupo}/${fname}"
+}
+
+
+
+#!/usr/bin/env bash
+
+KON_RUBY_VERSION="3.2.2"
+
+PYTHON_VERSIONS="2.7.18 3.13.2"
+
+function set_bin_path() {
+    colorecho "Adding ${KON_BIN} to PATH"
+    export PATH="${KON_BIN}:$PATH"
+}
+
+function set_cargo_env() {
+    colorecho "Setting cargo environment"
+    # shellcheck disable=SC1091
+    [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+}
+
+function set_ruby_env() {
+    colorecho "Setting ruby environment"
+    # shellcheck disable=SC1091
+    source /usr/local/rvm/scripts/rvm
+    rvm use "${KON_RUBY_VERSION}@default" >/dev/null 2>&1
+}
+
+function set_python_env() {
+    colorecho "Setting pyenv environment"
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="${PYENV_ROOT}/bin:$PATH"
+    eval "$(pyenv init --path)"
+    eval "$(pyenv init -)"
+}
+
+function set_env() {
+    colorecho "Setting env (caller)"
+    set_bin_path
+    set_cargo_env
+    set_ruby_env
+    set_python_env
+}
+
+function install_rvm() {
+    colorecho "Installing RVM (Ruby Version Manager)"
+    install_apt gnupg2
+    install_apt curl
+
+    curl -sSL https://rvm.io/mpapis.asc | gpg --import - >/dev/null 2>&1
+    curl -sSL https://rvm.io/pkuczynski.asc | gpg --import - >/dev/null 2>&1
+
+    curl -sSL https://get.rvm.io -o /tmp/rvm-installer.sh
+    bash /tmp/rvm-installer.sh stable >/dev/null 2>&1 \
+        && _ok "rvm: installer" || { _err "rvm: installer"; return 1; }
+    rm -f /tmp/rvm-installer.sh
+
+    # shellcheck disable=SC1091
+    source /usr/local/rvm/scripts/rvm
+
+    colorecho "Installing ruby ${KON_RUBY_VERSION} (default gemset)"
+    rvm install "${KON_RUBY_VERSION}" >/dev/null 2>&1 \
+        && _ok "rvm: ruby ${KON_RUBY_VERSION}" || _err "rvm: ruby ${KON_RUBY_VERSION}"
+    rvm use "${KON_RUBY_VERSION}@default" --create >/dev/null 2>&1
+
+    rvm cleanup all >/dev/null 2>&1 || true
+}
+
+install_gem() {
+    local gemset="$1" pkg="$2" version="${3:-}"
+    # shellcheck disable=SC1091
+    source /usr/local/rvm/scripts/rvm
+    rvm use "${KON_RUBY_VERSION}@${gemset}" --create >/dev/null 2>&1
+    if [[ -n "${version}" ]]; then
+        gem install -q "${pkg}" -v "${version}" >/dev/null 2>&1 \
+            && _ok "gem: ${pkg} (${version}) [gemset:${gemset}]" \
+            || _err "gem: ${pkg} (${version}) [gemset:${gemset}]"
+    else
+        gem install -q "${pkg}" >/dev/null 2>&1 \
+            && _ok "gem: ${pkg} [gemset:${gemset}]" \
+            || _err "gem: ${pkg} [gemset:${gemset}]"
+    fi
+    rvm use "${KON_RUBY_VERSION}@default" >/dev/null 2>&1
+}
+
+function install_pyenv() {
+    colorecho "Installing pyenv"
+    install_apt git
+    install_apt curl
+    install_apt build-essential
+
+    curl -o /tmp/pyenv.run https://pyenv.run
+    bash /tmp/pyenv.run >/dev/null 2>&1 \
+        && _ok "pyenv: installer" || { _err "pyenv: installer"; return 1; }
+    rm -f /tmp/pyenv.run
+
+    set_python_env
+
+    colorecho "Installing build deps for python2/python3 compilation"
+    install_apt libssl-dev
+    install_apt zlib1g-dev
+    install_apt libbz2-dev
+    install_apt libreadline-dev
+    install_apt libsqlite3-dev
+    install_apt libncurses5-dev
+    install_apt libncursesw5-dev
+    install_apt libffi-dev
+    install_apt liblzma-dev
+
+    local v
+    for v in $PYTHON_VERSIONS; do
+        colorecho "Installing python${v}"
+        pyenv install -s "$v" >/dev/null 2>&1 \
+            && _ok "pyenv: python${v}" || _err "pyenv: python${v}"
+    done
+
+    # shellcheck disable=SC2086
+    pyenv global $PYTHON_VERSIONS
+
+    install_apt python3-venv
+
+    _ok "pyenv: global versions set to: ${PYTHON_VERSIONS}"
+}
+
+colorecho() {
+    echo -e "${CYAN}[*]${RESET} $1"
+}
+
+venv_pip() {
+    local dest="$1"; shift
+    "${dest}/venv/bin/pip" install -q --no-cache-dir "$@" 2>/dev/null \
+        && _ok "pip: $*" || _err "pip: $*"
+}
+
+
+===== ./install/package_infra.sh =====
+#!/usr/bin/env bash
+source /kon/install/common.sh
+mkdir -p /anvil /opt/tools
+
+_gh_find_asset() {
+    local repo="$1" expr="$2"
+    python3 - "${repo}" "${expr}" << 'PYEOF'
+import sys, json, urllib.request, ssl
+
+repo = sys.argv[1]
+expr = sys.argv[2]
+
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+
+def fetch(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "curl/7.0"})
+    with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
+        return json.load(r)
+
+endpoints = [
+    f"https://api.github.com/repos/{repo}/releases/latest",
+    f"https://api.github.com/repos/{repo}/releases?per_page=10",
+]
+
+for ep in endpoints:
+    try:
+        data = fetch(ep)
+        releases = data if isinstance(data, list) else [data]
+        for release in releases:
+            for asset in release.get("assets", []):
+                n = asset["name"]
+                try:
+                    if eval(expr):
+                        print(asset["browser_download_url"])
+                        sys.exit(0)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+sys.exit(1)
+PYEOF
+}
+
+# debug helper: muestra todos los assets de un repo
+_gh_list_assets() {
+    local repo="$1"
+    python3 - "${repo}" << 'PYEOF'
+import sys, json, urllib.request, ssl
+repo = sys.argv[1]
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+req = urllib.request.Request(
+    f"https://api.github.com/repos/{repo}/releases/latest",
+    headers={"User-Agent": "curl/7.0"})
+with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
+    data = json.load(r)
+for a in data.get("assets", []):
+    print(a["name"])
+PYEOF
+}
+
+function install_socat()    { install_apt socat; }
+function install_ncat()     { install_apt ncat; }
+function install_sshuttle() { install_apt sshuttle; }
+
+function install_chisel() {
+    echo -e "  ${CYAN}bin${RESET} chisel"
+    local forja_dir="${KON_FORJA}/chisel"
+    mkdir -p "${forja_dir}"
+
+    install_apt unzip
+
+    # Obtener version
+    local version
+    version=$(python3 - << 'PYEOF'
+import urllib.request, json, ssl
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+req = urllib.request.Request(
+    "https://api.github.com/repos/jpillora/chisel/releases/latest",
+    headers={"User-Agent": "curl/7.0"})
+with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
+    print(json.load(r)["tag_name"].lstrip("v"))
+PYEOF
+)
+
+    if [[ -z "${version}" ]]; then
+        _err "chisel: no se pudo obtener la version del release"
+        return
+    fi
+
+    _info "chisel version: ${version}"
+    local base="https://github.com/jpillora/chisel/releases/download/v${version}"
+    local tmp
+    tmp=$(mktemp -d)
+
+    # ── Linux amd64 (.gz simple, no tar) ───────────────────────────────
+    curl -sL -o "${tmp}/chisel_linux.gz" \
+        "${base}/chisel_${version}_linux_amd64.gz"
+    gunzip -f "${tmp}/chisel_linux.gz" 2>/dev/null
+    if [[ -f "${tmp}/chisel_linux" ]]; then
+        chmod +x "${tmp}/chisel_linux"
+        cp "${tmp}/chisel_linux" "${KON_BIN}/chisel"
+        _ok "bin: chisel (linux/amd64) → ${KON_BIN}/chisel"
+    else
+        _err "bin: chisel (linux/amd64) — binario no encontrado"
+    fi
+    rm -rf "${tmp:?}"/*
+
+    # ── Windows amd64 (.zip) ───────────────────────────────────────────
+    curl -sL -o "${tmp}/chisel_windows.zip" \
+        "${base}/chisel_${version}_windows_amd64.zip"
+    mkdir -p "${tmp}/win"
+    unzip -q "${tmp}/chisel_windows.zip" -d "${tmp}/win" 2>/dev/null
+    local win_bin
+    win_bin=$(find "${tmp}/win" -maxdepth 3 -type f -name "*.exe" | head -1)
+    if [[ -n "${win_bin}" ]]; then
+        cp "${win_bin}" "${forja_dir}/chisel_windows_amd64.exe"
+        _ok "forja: chisel (windows/amd64) → ${forja_dir}/chisel_windows_amd64.exe"
+    else
+        _err "forja: chisel (windows/amd64) — exe no encontrado en zip"
+    fi
+
+    rm -rf "${tmp}"
+}
+
+function install_ligolo() {
+    echo -e "  ${CYAN}bin${RESET} ligolo-ng"
+    local forja_dir="${KON_FORJA}/ligolo"
+    mkdir -p "${forja_dir}"
+
+    install_apt unzip
+
+    # Obtener version
+    local version
+    version=$(python3 - << 'PYEOF'
+import urllib.request, json, ssl
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+req = urllib.request.Request(
+    "https://api.github.com/repos/nicocha30/ligolo-ng/releases/latest",
+    headers={"User-Agent": "curl/7.0"})
+with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
+    print(json.load(r)["tag_name"].lstrip("v"))
+PYEOF
+)
+
+    if [[ -z "${version}" ]]; then
+        _err "ligolo-ng: no se pudo obtener la version del release"
+        return
+    fi
+
+    _info "ligolo-ng version: ${version}"
+    local base="https://github.com/nicocha30/ligolo-ng/releases/download/v${version}"
+    local tmp
+    tmp=$(mktemp -d)
+
+    # ── Linux agent amd64 ─────────────────────────────────────────────
+    curl -sL -o "${tmp}/agent_linux.tar.gz" \
+        "${base}/ligolo-ng_agent_${version}_linux_amd64.tar.gz"
+    tar -xzf "${tmp}/agent_linux.tar.gz" -C "${tmp}" 2>/dev/null
+    local agent_bin
+    agent_bin=$(find "${tmp}" -maxdepth 3 -type f -name "agent" 2>/dev/null | head -1)
+    [[ -z "${agent_bin}" ]] && \
+        agent_bin=$(find "${tmp}" -maxdepth 3 -type f \
+            ! -name "*.tar.gz" ! -name "*.txt" ! -name "*.md" \
+            -perm /111 2>/dev/null | head -1)
+    if [[ -n "${agent_bin}" ]]; then
+        chmod +x "${agent_bin}"
+        cp "${agent_bin}" "${KON_BIN}/ligolo-agent"
+        _ok "bin: ligolo-agent (linux/amd64) → ${KON_BIN}/ligolo-agent"
+    else
+        _err "bin: ligolo-agent (linux/amd64) — binario no encontrado en tar"
+    fi
+    rm -rf "${tmp:?}"/*
+
+    # ── Linux proxy amd64 ─────────────────────────────────────────────
+    curl -sL -o "${tmp}/proxy_linux.tar.gz" \
+        "${base}/ligolo-ng_proxy_${version}_linux_amd64.tar.gz"
+    tar -xzf "${tmp}/proxy_linux.tar.gz" -C "${tmp}" 2>/dev/null
+    local proxy_bin
+    proxy_bin=$(find "${tmp}" -maxdepth 3 -type f -name "proxy" 2>/dev/null | head -1)
+    [[ -z "${proxy_bin}" ]] && \
+        proxy_bin=$(find "${tmp}" -maxdepth 3 -type f \
+            ! -name "*.tar.gz" ! -name "*.txt" ! -name "*.md" \
+            -perm /111 2>/dev/null | head -1)
+    if [[ -n "${proxy_bin}" ]]; then
+        chmod +x "${proxy_bin}"
+        cp "${proxy_bin}" "${KON_BIN}/ligolo-proxy"
+        _ok "bin: ligolo-proxy (linux/amd64) → ${KON_BIN}/ligolo-proxy"
+    else
+        _err "bin: ligolo-proxy (linux/amd64) — binario no encontrado en tar"
+    fi
+    rm -rf "${tmp:?}"/*
+
+    # ── Windows agent x64 ─────────────────────────────────────────────
+    curl -sL -o "${tmp}/agent_windows.zip" \
+        "${base}/ligolo-ng_agent_${version}_windows_amd64.zip"
+    mkdir -p "${tmp}/agent_win"
+    unzip -q "${tmp}/agent_windows.zip" -d "${tmp}/agent_win" 2>/dev/null
+    local agent_win
+    agent_win=$(find "${tmp}/agent_win" -maxdepth 3 -type f -name "*.exe" | head -1)
+    if [[ -n "${agent_win}" ]]; then
+        cp "${agent_win}" "${forja_dir}/ligolo-agent_windows_amd64.exe"
+        _ok "forja: ligolo-agent (windows/amd64) → ${forja_dir}/ligolo-agent_windows_amd64.exe"
+    else
+        _err "forja: ligolo-agent (windows/amd64) — exe no encontrado en zip"
+    fi
+    rm -rf "${tmp:?}"/*
+
+    # ── Windows proxy x64 ─────────────────────────────────────────────
+    curl -sL -o "${tmp}/proxy_windows.zip" \
+        "${base}/ligolo-ng_proxy_${version}_windows_amd64.zip"
+    mkdir -p "${tmp}/proxy_win"
+    unzip -q "${tmp}/proxy_windows.zip" -d "${tmp}/proxy_win" 2>/dev/null
+    local proxy_win
+    proxy_win=$(find "${tmp}/proxy_win" -maxdepth 3 -type f -name "*.exe" | head -1)
+    if [[ -n "${proxy_win}" ]]; then
+        cp "${proxy_win}" "${forja_dir}/ligolo-proxy_windows_amd64.exe"
+        _ok "forja: ligolo-proxy (windows/amd64) → ${forja_dir}/ligolo-proxy_windows_amd64.exe"
+    else
+        _err "forja: ligolo-proxy (windows/amd64) — exe no encontrado en zip"
+    fi
+
+    rm -rf "${tmp}"
+}
+
+function install_sliver() {
+    echo -e "  ${CYAN}bin${RESET} sliver"
+    local dest_dir="${KON_SRC}/sliver"
+    mkdir -p "${dest_dir}"
+    local arch="amd64"
+    [[ $(uname -m) == "aarch64" ]] && arch="arm64"
+
+    local url_server url_client
+    url_server=$(_gh_find_asset "BishopFox/sliver" \
+        "'sliver-server' in n and 'linux' in n and '${arch}' in n")
+    url_client=$(_gh_find_asset "BishopFox/sliver" \
+        "'sliver-client' in n and 'linux' in n and '${arch}' in n")
+
+    if [[ -n "${url_server}" ]]; then
+        curl -sL -o "${dest_dir}/sliver-server" "${url_server}"
+        chmod +x "${dest_dir}/sliver-server"
+        ln -sf "${dest_dir}/sliver-server" "${KON_BIN}/sliver-server"
+        _ok "bin: sliver-server → ${KON_BIN}/sliver-server"
+    else
+        _err "bin: sliver-server"
+    fi
+
+    if [[ -n "${url_client}" ]]; then
+        curl -sL -o "${dest_dir}/sliver-client" "${url_client}"
+        chmod +x "${dest_dir}/sliver-client"
+        ln -sf "${dest_dir}/sliver-client" "${KON_BIN}/sliver-client"
+        _ok "bin: sliver-client → ${KON_BIN}/sliver-client"
+    else
+        _err "bin: sliver-client"
+    fi
+}
+
+function install_villain() {
+    local dest="${KON_SRC}/Villain"
+    install_git Villain https://github.com/t3l3machus/Villain
+    if [[ -f "${dest}/requirements.txt" ]]; then
+        python3 -m pip install -q --no-cache-dir --break-system-packages \
+            -r "${dest}/requirements.txt" 2>/dev/null || true
+    fi
+    if [[ -f "${dest}/Villain.py" ]]; then
+        printf '#!/usr/bin/env bash\nexec python3 "%s/Villain.py" "$@"\n' \
+            "${dest}" > "${KON_BIN}/villain"
+        chmod +x "${KON_BIN}/villain"
+        _ok "git: Villain → ${KON_BIN}/villain"
+    else
+        _err "git: Villain (Villain.py not found)"
+    fi
+}
+function install_pwncat() {
+    echo -e "  ${CYAN}pip${RESET} pwncat-cs"
+
+    # Desinstalar instalación previa para empezar limpio
+    python3 -m pip uninstall -y --break-system-packages \
+        pwncat-cs ZODB ZODB3 ZEO zodburi persistent transaction BTrees \
+        zc.lockfile zodbpickle zope.interface zope.proxy zope.deferredimport \
+        2>/dev/null || true
+
+    # Instalar desde el repo de GitHub (trae todas las deps correctas)
+    python3 -m pip install -q --no-cache-dir --break-system-packages \
+        "git+https://github.com/calebstewart/pwncat.git" 2>&1 | tail -10
+
+    # Fijar zodburi en el rango que pwncat-cs realmente requiere (<3.0.0)
+    python3 -m pip install -q --no-cache-dir --break-system-packages \
+        --force-reinstall "zodburi<3.0.0,>=2.5.0" 2>&1 | tail -5
+
+    if command -v pwncat-cs >/dev/null 2>&1; then
+        ln -sf "$(command -v pwncat-cs)" "${KON_BIN}/pwncat-cs" 2>/dev/null || true
+        _ok "pip: pwncat-cs → ${KON_BIN}/pwncat-cs"
+    else
+        _err "pip: pwncat-cs"
+    fi
+}
+
+function install_havoc() {
+    echo -e "  ${CYAN}git${RESET} Havoc"
+    local dest="${KON_SRC}/Havoc"
+
+    if [[ ! -d "${dest}" ]]; then
+        git clone -q --depth 1 --recursive --shallow-submodules \
+            https://github.com/HavocFramework/Havoc "${dest}" \
+            || { _err "git: Havoc (clone failed)"; return; }
+    fi
+
+    cd "${dest}" || return
+
+    install_apt build-essential
+    install_apt cmake
+    install_apt libboost-all-dev
+    install_apt qtmultimedia5-dev
+    install_apt libqt5websockets5-dev
+
+    # teamserver — quitar golang-go del script de deps porque ya tenemos go en PATH
+    if [[ -f "teamserver/Install.sh" ]]; then
+        sed -i 's/\bgolang-go\b//' teamserver/Install.sh
+    fi
+    make ts-build 2>&1 | tail -3
+    if [[ -f "${dest}/havoc" ]]; then
+        _ok "build: havoc teamserver"
+    else
+        _err "build: havoc teamserver"
+    fi
+
+    make client-build 2>&1 | tail -3
+    if [[ -f "${dest}/havoc" ]]; then
+        _ok "build: havoc client"
+    fi
+
+    rm -rf "${dest}/client/Build/" 2>/dev/null || true
+
+    # Havoc usa rutas relativas internas → wrapper que cd al src
+    if [[ -f "${dest}/havoc" ]]; then
+        printf '#!/usr/bin/env bash\ncd "%s" && exec ./havoc "$@"\n' \
+            "${dest}" > "${KON_BIN}/havoc"
+        chmod +x "${KON_BIN}/havoc"
+        _ok "git: Havoc → ${KON_BIN}/havoc"
+    else
+        _err "git: Havoc (build fallido — binario no encontrado)"
+    fi
+
+    cd /anvil
+}
+
+function install_metasploit() {
+    echo -e "  ${CYAN}git${RESET} metasploit-framework"
+    local dest="${KON_SRC}/metasploit-framework"
+
+    install_apt libpcap-dev
+    install_apt libpq-dev
+    install_apt zlib1g-dev
+    install_apt libsqlite3-dev
+    install_apt postgresql
+
+    if [[ ! -d "${dest}" ]]; then
+        git clone -q --depth 1 \
+            https://github.com/rapid7/metasploit-framework.git "${dest}" \
+            || { _err "git: metasploit-framework (clone failed)"; return; }
+    fi
+
+    cd "${dest}" || return
+    git config user.name "kon"
+    git config user.email "kon@localhost"
+
+    # rvm: instalar si no existe
+    if ! command -v rvm >/dev/null 2>&1; then
+        curl -sSL https://rvm.io/mpapis.asc | gpg --import - 2>/dev/null || true
+        curl -sSL https://rvm.io/pkuczynski.asc | gpg --import - 2>/dev/null || true
+        curl -sSL https://get.rvm.io | bash -s stable >/dev/null 2>&1
+    fi
+    # source rvm
+    # shellcheck disable=SC1091
+    [[ -s /etc/profile.d/rvm.sh ]] && source /etc/profile.d/rvm.sh
+    [[ -s ~/.rvm/scripts/rvm   ]] && source ~/.rvm/scripts/rvm
+
+    rvm install 3.3.8 --quiet 2>/dev/null || true
+    rvm use 3.3.8@metasploit-framework --create --quiet 2>/dev/null || true
+
+    gem install bundler --quiet --no-document 2>/dev/null || true
+    bundle install --quiet 2>/dev/null || true
+    gem install rex rex-text --quiet --no-document 2>/dev/null || true
+    gem install timeout --version 0.4.1 --quiet --no-document 2>/dev/null || true
+
+    # msfdb init
+    chmod -R o+rx "${dest}/"
+    chmod 444 "${dest}/.git/index" 2>/dev/null || true
+    cp -r /root/.bundle /var/lib/postgresql/ 2>/dev/null || true
+    chown -R postgres:postgres /var/lib/postgresql/.bundle 2>/dev/null || true
+
+    sudo -u postgres bash -c "
+        source /etc/profile.d/rvm.sh 2>/dev/null || source ~/.rvm/scripts/rvm 2>/dev/null || true
+        git config --global --add safe.directory ${dest}
+        rvm use 3.3.8@metasploit-framework --quiet 2>/dev/null || true
+        bundle exec ${dest}/msfdb init 2>/dev/null || true
+    " 2>/dev/null || true
+
+    cp -r /var/lib/postgresql/.msf4 /root 2>/dev/null || true
+
+    # peass module
+    curl -sL \
+        https://raw.githubusercontent.com/peass-ng/PEASS-ng/master/metasploit/peass.rb \
+        -o "${dest}/modules/post/multi/gather/peass.rb" 2>/dev/null || true
+
+    # wrappers en KON_BIN — sourcea rvm + activa gemset antes de ejecutar
+    # esto soluciona el "LicenseFinder not checked out" que pasa cuando
+    # el gemset no está activo al momento de correr el wrapper
+    for tool in msfconsole msfvenom msfdb msfrpc msfrpcd msfupdate; do
+        if [[ -f "${dest}/${tool}" ]]; then
+            cat > "${KON_BIN}/${tool}" << WRAPPER
+#!/usr/bin/env bash
+[[ -s /etc/profile.d/rvm.sh ]] && source /etc/profile.d/rvm.sh
+[[ -s ~/.rvm/scripts/rvm   ]] && source ~/.rvm/scripts/rvm
+rvm use 3.3.8@metasploit-framework --quiet 2>/dev/null || true
+cd "${dest}"
+exec "${dest}/${tool}" "\$@"
+WRAPPER
+            chmod +x "${KON_BIN}/${tool}"
+        fi
+    done
+    _ok "git: metasploit → ${KON_BIN}/msfconsole + msfvenom + ..."
+
+    cd /anvil
+}
+
+function install_proxify() {
+    # proxify usa un import path distinto desde v0.0.13
+    install_go proxify github.com/projectdiscovery/proxify/cmd/proxify@latest
+}
+
+function install_goproxy() {
+    install_go goproxy github.com/snail007/goproxy@latest
+}
+
+function package_infra() {
+    echo ""
+    echo -e "\033[0;36m[*] ┌┬┬ INFRA / C2 ┬┬┐\033[0m"
+
+    install_socat
+    install_ncat
+    install_sshuttle
+
+    install_chisel
+    install_ligolo
+
+    install_villain
+    install_havoc
+    install_pwncat
+    install_sliver
+    install_metasploit
+
+    install_proxify
+    install_goproxy
+
+    echo -e "\033[0;32m[OK]  INFRA package completed${RESET}"
+}
+
+
+===== ./install/package_recon.sh =====
+#!/usr/bin/env bash
+source /kon/install/common.sh
+mkdir -p /opt/tools
+
+_gh_find_asset() {
+    local repo="$1" expr="$2"
+    python3 - "${repo}" "${expr}" << 'PYEOF'
+import sys, json, urllib.request, ssl
+
+repo = sys.argv[1]
+expr = sys.argv[2]
+
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+
+def fetch(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "curl/7.0"})
+    with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
+        return json.load(r)
+
+endpoints = [
+    f"https://api.github.com/repos/{repo}/releases/latest",
+    f"https://api.github.com/repos/{repo}/releases?per_page=10",
+]
+
+for ep in endpoints:
+    try:
+        data = fetch(ep)
+        releases = data if isinstance(data, list) else [data]
+        for release in releases:
+            for asset in release.get("assets", []):
+                n = asset["name"]
+                try:
+                    if eval(expr):
+                        print(asset["browser_download_url"])
+                        sys.exit(0)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+sys.exit(1)
+PYEOF
+}
+
+install_nmap()      { install_apt nmap; }
+install_masscan()   { install_apt masscan; }
+install_whois()     { install_apt whois; }
+install_dnsutils()  { install_apt dnsutils; }
+install_netcat()    { install_apt ncat; }
+install_jq()        { install_apt jq; }
+install_dirb()      { install_apt dirb; }
+
+install_subfinder() { install_go subfinder github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest; }
+install_httpx()     { install_go httpx github.com/projectdiscovery/httpx/cmd/httpx@latest; }
+install_nuclei()    { install_go nuclei github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest; }
+install_dnsx()      { install_go dnsx github.com/projectdiscovery/dnsx/cmd/dnsx@latest; }
+install_naabu()     { install_go naabu github.com/projectdiscovery/naabu/v2/cmd/naabu@latest; }
+install_katana()    { install_go katana github.com/projectdiscovery/katana/cmd/katana@latest; }
+install_tlsx()      { install_go tlsx github.com/projectdiscovery/tlsx/cmd/tlsx@latest; }
+install_alterx()    { install_go alterx github.com/projectdiscovery/alterx/cmd/alterx@latest; }
+install_ffuf()      { install_go ffuf github.com/ffuf/ffuf/v2@latest; }
+install_gobuster()  { install_go gobuster github.com/OJ/gobuster/v3@latest; }
+install_amass()     { install_go amass github.com/owasp-amass/amass/v4/...@master; }
+
+install_wafw00f()   { install_pip wafw00f; }
+install_arjun()     { install_pip arjun; }
+
+function install_feroxbuster() {
+    echo -e "  ${CYAN}bin${RESET} feroxbuster"
+    local dest_dir="${KON_SRC}/feroxbuster"
+    mkdir -p "${dest_dir}"
+    command -v unzip >/dev/null 2>&1 || install_apt unzip
+
+    local url
+    url=$(_gh_find_asset "epi052/feroxbuster" "n.endswith('amd64.deb')")
+    if [[ -n "${url}" ]]; then
+        curl -sL -o "${dest_dir}/feroxbuster.deb" "${url}"
+        dpkg -i "${dest_dir}/feroxbuster.deb" >/dev/null 2>&1 \
+            || apt-get -f install -y >/dev/null 2>&1
+        if command -v feroxbuster >/dev/null 2>&1; then
+            ln -sf "$(command -v feroxbuster)" "${KON_BIN}/feroxbuster"
+            _ok "deb: feroxbuster → ${KON_BIN}/feroxbuster"
+            return
+        fi
+    fi
+
+    url=$(_gh_find_asset "epi052/feroxbuster" \
+        "'x86_64-linux' in n and 'musl' in n and n.endswith('.zip')")
+    [[ -z "${url}" ]] && url=$(_gh_find_asset "epi052/feroxbuster" \
+        "'x86_64-linux' in n and n.endswith('.zip')")
+
+    if [[ -n "${url}" ]]; then
+        curl -sL -o "${dest_dir}/feroxbuster.zip" "${url}"
+        unzip -qo "${dest_dir}/feroxbuster.zip" -d "${dest_dir}"
+        rm -f "${dest_dir}/feroxbuster.zip"
+        if [[ -f "${dest_dir}/feroxbuster" ]]; then
+            chmod +x "${dest_dir}/feroxbuster"
+            if "${dest_dir}/feroxbuster" --version >/dev/null 2>&1; then
+                ln -sf "${dest_dir}/feroxbuster" "${KON_BIN}/feroxbuster"
+                _ok "bin: feroxbuster → ${KON_BIN}/feroxbuster"
+                return
+            fi
+        fi
+    fi
+
+    _err "feroxbuster: todos los métodos fallaron"
+}
+
+function install_rustscan() {
+    echo -e "  ${CYAN}bin${RESET} rustscan"
+    local dest_dir="${KON_SRC}/rustscan"
+    mkdir -p "${dest_dir}"
+
+    local url
+    url=$(_gh_find_asset "RustScan/RustScan" \
+        "n.endswith('amd64.deb') or ('amd64' in n and n.endswith('.deb'))")
+    if [[ -n "${url}" ]]; then
+        curl -sL -o "${dest_dir}/rustscan.deb" "${url}"
+        dpkg -i "${dest_dir}/rustscan.deb" >/dev/null 2>&1 \
+            || apt-get -f install -y >/dev/null 2>&1
+        if command -v rustscan >/dev/null 2>&1; then
+            ln -sf "$(command -v rustscan)" "${KON_BIN}/rustscan"
+            _ok "deb: rustscan → ${KON_BIN}/rustscan"
+            return
+        fi
+    fi
+
+    url=$(_gh_find_asset "RustScan/RustScan" \
+        "('x86_64' in n or 'amd64' in n) and 'linux' in n.lower() and not n.endswith('.deb')")
+    if [[ -n "${url}" ]]; then
+        local fname
+        fname=$(basename "${url}")
+        curl -sL -o "${dest_dir}/${fname}" "${url}"
+        [[ "${fname}" == *.tar.gz ]] && tar -xzf "${dest_dir}/${fname}" -C "${dest_dir}" 2>/dev/null
+        [[ "${fname}" == *.zip ]] && unzip -qo "${dest_dir}/${fname}" -d "${dest_dir}" 2>/dev/null
+        local bin_path
+        bin_path=$(find "${dest_dir}" -type f -name "rustscan" 2>/dev/null | head -1)
+        [[ -z "${bin_path}" ]] && bin_path="${dest_dir}/${fname}"
+        if [[ -f "${bin_path}" ]]; then
+            chmod +x "${bin_path}"
+            if "${bin_path}" --version >/dev/null 2>&1; then
+                ln -sf "${bin_path}" "${KON_BIN}/rustscan"
+                _ok "bin: rustscan → ${KON_BIN}/rustscan"
+                return
+            fi
+        fi
+    fi
+
+    url=$(_gh_find_asset "RustScan/RustScan" \
+        "'rustscan' in n.lower() and not n.endswith('.deb') and not n.endswith('.sha256')")
+    if [[ -n "${url}" ]]; then
+        local fname
+        fname=$(basename "${url}")
+        curl -sL -o "${dest_dir}/${fname}" "${url}"
+        [[ "${fname}" == *.tar.gz ]] && tar -xzf "${dest_dir}/${fname}" -C "${dest_dir}" 2>/dev/null
+        [[ "${fname}" == *.zip ]] && unzip -qo "${dest_dir}/${fname}" -d "${dest_dir}" 2>/dev/null
+        local bin_path
+        bin_path=$(find "${dest_dir}" -type f \
+            ! -name "*.tar.gz" ! -name "*.zip" ! -name "*.sha256" ! -name "*.deb" \
+            2>/dev/null | head -1)
+        if [[ -n "${bin_path}" ]]; then
+            chmod +x "${bin_path}"
+            if "${bin_path}" --version >/dev/null 2>&1; then
+                ln -sf "${bin_path}" "${KON_BIN}/rustscan"
+                _ok "bin: rustscan → ${KON_BIN}/rustscan"
+                return
+            fi
+        fi
+    fi
+
+    _err "rustscan: todos los métodos fallaron"
+}
+
+function install_nikto() {
+    echo -e "  ${CYAN}git${RESET} nikto"
+    local dest="${KON_SRC}/nikto"
+
+    if [[ ! -d "${dest}" ]]; then
+        git clone -q --depth 1 "https://github.com/sullo/nikto" "${dest}" \
+            || { _err "git: nikto (clone failed)"; return; }
+    fi
+
+    command -v perl >/dev/null 2>&1 || install_apt perl
+    command -v cpanm >/dev/null 2>&1 || install_apt cpanminus
+    cpanm --notest --quiet JSON XML::Writer 2>/dev/null || true
+
+    if [[ -f "${dest}/program/nikto.pl" ]]; then
+        chmod +x "${dest}/program/nikto.pl"
+        printf '#!/usr/bin/env bash\nexport LC_ALL=C LANG=C\nexec perl "%s/program/nikto.pl" "$@"\n' \
+            "${dest}" > "${KON_BIN}/nikto"
+        chmod +x "${KON_BIN}/nikto"
+        _ok "git: nikto → ${KON_BIN}/nikto"
+    else
+        _err "git: nikto (nikto.pl not found)"
+    fi
+}
+
+function install_eyewitness() {
+    echo -e "  ${CYAN}git${RESET} EyeWitness"
+    local dest="${KON_SRC}/EyeWitness"
+
+    if [[ ! -d "${dest}" ]]; then
+        git clone -q --depth 1 "https://github.com/RedSiege/EyeWitness" "${dest}" \
+            || { _err "git: EyeWitness (clone failed)"; return; }
+    fi
+
+    if [[ -f "${dest}/Python/requirements.txt" ]]; then
+        python3 -m pip install -q --no-cache-dir --break-system-packages \
+            -r "${dest}/Python/requirements.txt" 2>/dev/null || true
+    fi
+    for pkg in netaddr selenium fuzzywuzzy python-Levenshtein; do
+        python3 -c "import ${pkg//-/_}" 2>/dev/null \
+            || python3 -m pip install -q --no-cache-dir --break-system-packages \
+                "${pkg}" 2>/dev/null || true
+    done
+
+    if [[ -f "${dest}/Python/EyeWitness.py" ]]; then
+        printf '#!/usr/bin/env bash\nexec python3 "%s/Python/EyeWitness.py" "$@"\n' \
+            "${dest}" > "${KON_BIN}/eyewitness"
+        chmod +x "${KON_BIN}/eyewitness"
+        _ok "git: EyeWitness → ${KON_BIN}/eyewitness"
+    else
+        _err "git: EyeWitness (EyeWitness.py not found)"
+    fi
+}
+
+function package_recon() {
+    echo ""
+    echo -e "\033[0;36m[*] ┌┬┬ RECON ┬┬┐\033[0m"
+
+    install_nmap
+    install_masscan
+    install_whois
+    install_dnsutils
+    install_netcat
+    install_jq
+    install_dirb
+
+    install_subfinder
+    install_httpx
+    install_nuclei
+    install_dnsx
+    install_naabu
+    install_katana
+    install_tlsx
+    install_alterx
+    install_ffuf
+    install_gobuster
+    install_amass
+
+    install_wafw00f
+    install_arjun
+
+    install_feroxbuster
+    install_rustscan
+    install_nikto
+    install_eyewitness
+
+    echo -e "\033[0;32m[OK]  RECON package completed${RESET}"
+}
+
+

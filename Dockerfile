@@ -15,7 +15,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash ca-certificates curl wget git gnupg locate\
     python3 python3-pip iproute2 iputils-ping nano\
-    dnsutils net-tools procps locales tzdata \
+    dnsutils net-tools procps locales tzdata ntpdate\
     less vim sudo openssh-client \
     build-essential gcc libssl-dev libffi-dev \
     python3-dev \
@@ -74,51 +74,51 @@ RUN chmod +x /kon/install/package_recon.sh && \
 # ── [L7] package_wordlists (DESACTIVADO) ─────────────────────────────────
 # More stable: wordlists do not change frequently.
 # Placed first among the packages to maximize cache hits.
-# COPY install/package_wordlists.sh /kon/install/package_wordlists.sh
-# RUN chmod +x /kon/install/package_wordlists.sh && \
-#    apt-get update && \
-#    bash -c 'source /kon/install/common.sh && \
-#             source /kon/install/package_wordlists.sh && \
-#             package_wordlists' && \
-#    apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/package_wordlists.sh /kon/install/package_wordlists.sh
+RUN chmod +x /kon/install/package_wordlists.sh && \
+    apt-get update && \
+    bash -c 'source /kon/install/common.sh && \
+             source /kon/install/package_wordlists.sh && \
+             package_wordlists' && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ── [L8] package_ad (DESACTIVADO) ────────────────────────────────────────
 # AD tools: stable, but more complex than wordlists.
-# COPY install/package_ad.sh /kon/install/package_ad.sh
-# RUN chmod +x /kon/install/package_ad.sh && \
-#    apt-get update && \
-#    bash -c 'source /kon/install/common.sh && \
-#             source /kon/install/package_ad.sh && \
-#             package_ad' && \
-#    apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/package_ad.sh /kon/install/package_ad.sh
+RUN chmod +x /kon/install/package_ad.sh && \
+    apt-get update && \
+    bash -c 'source /kon/install/common.sh && \
+              source /kon/install/package_ad.sh && \
+             package_ad' && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ── [L9] package_infra (DESACTIVADO) ─────────────────────────────────────
 # Placed last among the packages because it is the one you actively change the most.
 # Changing infra only invalidates this layer and assets/runtime L10-L12.
-# COPY install/package_infra.sh /kon/install/package_infra.sh
-# RUN chmod +x /kon/install/package_infra.sh && \
-#     apt-get update && \
-#     bash -c 'source /kon/install/common.sh && \
-#              source /kon/install/package_infra.sh && \
-#              package_infra' && \
-#     apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/package_infra.sh /kon/install/package_infra.sh
+RUN chmod +x /kon/install/package_infra.sh && \
+     apt-get update && \
+     bash -c 'source /kon/install/common.sh && \
+              source /kon/install/package_infra.sh && \
+              package_infra' && \
+     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 
 
 # ── [L10] package_web commented out, structure ready to activate ────────
-# COPY install/package_web.sh /kon/install/package_web.sh
-# RUN chmod +x /kon/install/package_web.sh && \
-#     apt-get update && \
-#     bash -c 'source /kon/install/common.sh && \
-#              source /kon/install/package_web.sh && \
-#              package_web' && \
-#     apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/package_web.sh /kon/install/package_web.sh
+RUN chmod +x /kon/install/package_web.sh && \
+     apt-get update && \
+     bash -c 'source /kon/install/common.sh && \
+              source /kon/install/package_web.sh && \
+              package_web' && \
+     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# CREAR MAS LAYERS EN CASO SE QUIERA AGREGAR NUEVAS TOOLS COMO 5.1.1.sh o algo asi, juntas como 15 tools nuevas y le metes genarin del futuro
 
 # ── [L11] Assets ──────────────────────────────────────────────────────────
 # Separated from install/: changing an alias or the banner does not touch any package.
 COPY assets/ /kon/assets/
+COPY version/ /kon/version/
 
 # ── [L12] Runtime and ZSH config ─────────────────────────────────────────
 # The most volatile part: startup scripts and shell configuration.

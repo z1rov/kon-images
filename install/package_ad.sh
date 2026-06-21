@@ -28,6 +28,42 @@ function install_ad_base() {
     install_apt unzip
     install_apt python3-venv
     install_apt python3-pip
+    install_apt gcc-mingw-w64-x86-64
+}
+function install_rust() {
+    if command -v rustc >/dev/null 2>&1; then
+        _info "skip: rust (already installed: $(rustc --version))"
+        return
+    fi
+ 
+    if [[ -f "${HOME}/.cargo/env" ]]; then
+        # shellcheck disable=SC1091
+        source "${HOME}/.cargo/env"
+        if command -v rustc >/dev/null 2>&1; then
+            _info "skip: rust (already installed via rustup: $(rustc --version))"
+            return
+        fi
+    fi
+ 
+    install_apt curl
+ 
+    curl -sSf https://sh.rustup.rs -o /tmp/rustup-init.sh \
+        || { _err "rust: download rustup-init failed"; return 1; }
+ 
+    bash /tmp/rustup-init.sh -y --default-toolchain stable --profile minimal >/dev/null 2>&1 \
+        && _ok "rust: rustup stable toolchain" || { _err "rust: rustup install failed"; rm -f /tmp/rustup-init.sh; return 1; }
+ 
+    rm -f /tmp/rustup-init.sh
+ 
+    # shellcheck disable=SC1091
+    source "${HOME}/.cargo/env"
+ 
+    if command -v rustc >/dev/null 2>&1; then
+        _ok "rust: $(rustc --version) → ${HOME}/.cargo/bin"
+    else
+        _err "rust: install finished but rustc not found on PATH"
+        return 1
+    fi
 }
 
 function install_bloodhound_ce() {
@@ -156,8 +192,43 @@ function install_roadrecon()      {
 }
 
 function install_netexec() {
-    pipx install git+https://github.com/Pennyw0rth/NetExec >/dev/null 2>&1 \
-        && _ok "pipx: netexec" || _err "pipx: netexec"
+    local NXC_DIR="${KON_SRC}/NetExec"
+ 
+    # aardwolf (dep de nxc para ldap/kerberos) compila extensiones nativas en Rust.
+    install_rust || { _err "netexec: aborting, rust toolchain required to build aardwolf"; return 1; }
+    # shellcheck disable=SC1091
+    [[ -f "${HOME}/.cargo/env" ]] && source "${HOME}/.cargo/env"
+ 
+    if [[ -d "${NXC_DIR}" ]]; then
+        _info "skip: netexec (already exists)"
+    else
+        git clone -q --depth 1 https://github.com/Pennyw0rth/NetExec "${NXC_DIR}" >/dev/null 2>&1 \
+            || { _err "git: netexec"; return 1; }
+    fi
+ 
+    # Aseguramos que pipx tenga su PATH seteado (idempotente, no rompe si ya estaba corrido).
+    pipx ensurepath >/dev/null 2>&1
+    export PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
+ 
+    # Sin silenciar stderr: si pipx falla queremos VER por qué (deps de compilación,
+    # conflicto de versión, etc.) en vez de descubrirlo recién al buscar el binario.
+    if pipx install --system-site-packages --force "${NXC_DIR}"; then
+        _ok "pipx: netexec"
+    else
+        _err "pipx: netexec (ver output de pipx arriba)"
+        return 1
+    fi
+ 
+    local pipx_bin="${HOME}/.local/bin/nxc"
+    if [[ -f "${pipx_bin}" ]]; then
+        ln -sf "${pipx_bin}" "${KON_BIN}/nxc"
+        _ok "bin: nxc → ${KON_BIN}/nxc"
+    else
+        _err "netexec: nxc binary not found at ${pipx_bin} after pipx install"
+        _info "pipx list:"
+        pipx list 2>&1 | sed 's/^/         /'
+        return 1
+    fi
 }
 
 function install_manspider() {
@@ -174,10 +245,34 @@ function install_enum4linux_ng() {
 }
 
 function install_pcredz() {
-    install_pip Cython
-    install_pip python-libpcap
-    install_git PCredz https://github.com/lgandx/PCredz
-    link_bin Pcredz.py "${KON_SRC}/PCredz/Pcredz"
+    local PCREDZ_DIR="${KON_SRC}/PCredz"
+ 
+    install_apt libpcap-dev
+ 
+    if [[ -d "${PCREDZ_DIR}" ]]; then
+        _info "skip: PCredz (already exists)"
+    else
+        git clone -q --depth 1 https://github.com/lgandx/PCredz "${PCREDZ_DIR}" >/dev/null 2>&1 \
+            || { _err "git: PCredz"; return 1; }
+ 
+        python3 -m venv --system-site-packages "${PCREDZ_DIR}/venv" >/dev/null 2>&1
+        "${PCREDZ_DIR}/venv/bin/pip3" install -q --no-cache-dir Cython >/dev/null 2>&1 \
+            && _ok "pip: Cython [PCredz venv]" || _err "pip: Cython [PCredz venv]"
+        "${PCREDZ_DIR}/venv/bin/pip3" install -q --no-cache-dir pcapy-ng >/dev/null 2>&1 \
+            && _ok "pip: pcapy-ng [PCredz venv]" || _err "pip: pcapy-ng [PCredz venv]"
+    fi
+ 
+    cat > "${KON_BIN}/Pcredz" << EOF
+#!/usr/bin/env bash
+cd "${PCREDZ_DIR}" && exec ./venv/bin/python3 ./Pcredz "\$@"
+EOF
+    chmod +x "${KON_BIN}/Pcredz"
+ 
+    if "${KON_BIN}/Pcredz" -h >/dev/null 2>&1; then
+        _ok "Pcredz → ${KON_BIN}/Pcredz"
+    else
+        _err "Pcredz: wrapper created but tool failed to run (check venv deps)"
+    fi
 }
 
 function install_enum4linux() {
@@ -198,13 +293,73 @@ function install_pywerview() {
 }
 
 function install_responder() {
-    install_git Responder https://github.com/lgandx/Responder
-    link_bin Responder.py "${KON_SRC}/Responder/Responder.py"
+    local RESP_DIR="${KON_SRC}/Responder"
+
+    install_apt gcc-mingw-w64-x86-64
+
+    if [[ -d "${RESP_DIR}" ]]; then
+        _info "skip: Responder (already exists)"
+    else
+        git clone -q --depth 1 https://github.com/lgandx/Responder "${RESP_DIR}" >/dev/null 2>&1 \
+            || { _err "git: Responder"; return 1; }
+
+        python3 -m venv --system-site-packages "${RESP_DIR}/venv" >/dev/null 2>&1
+        "${RESP_DIR}/venv/bin/pip3" install -q --no-cache-dir -r "${RESP_DIR}/requirements.txt" >/dev/null 2>&1 \
+            && _ok "pip: Responder requirements [venv]" || _err "pip: Responder requirements [venv]"
+        # following requirements needed by MultiRelay.py
+        "${RESP_DIR}/venv/bin/pip3" install -q --no-cache-dir pycryptodomex six >/dev/null 2>&1 \
+            && _ok "pip: pycryptodomex six [Responder venv]" || _err "pip: pycryptodomex six [Responder venv]"
+
+        sed -i 's/ Random/ 1122334455667788/g' "${RESP_DIR}/Responder.conf"
+        sed -i "s/files\/AccessDenied.html/\/${RESP_DIR//\//\\/}\/files\/AccessDenied.html/g" "${RESP_DIR}/Responder.conf"
+        sed -i "s/files\/BindShell.exe/\/${RESP_DIR//\//\\/}\/files\/BindShell.exe/g" "${RESP_DIR}/Responder.conf"
+        sed -i "s/certs\/responder.crt/\/${RESP_DIR//\//\\/}\/certs\/responder.crt/g" "${RESP_DIR}/Responder.conf"
+        sed -i "s/certs\/responder.key/\/${RESP_DIR//\//\\/}\/certs\/responder.key/g" "${RESP_DIR}/Responder.conf"
+
+        x86_64-w64-mingw32-gcc "${RESP_DIR}/tools/MultiRelay/bin/Runas.c" \
+            -o "${RESP_DIR}/tools/MultiRelay/bin/Runas.exe" -municode -lwtsapi32 -luserenv >/dev/null 2>&1 \
+            && _ok "mingw: Runas.exe" || _err "mingw: Runas.exe"
+        x86_64-w64-mingw32-gcc "${RESP_DIR}/tools/MultiRelay/bin/Syssvc.c" \
+            -o "${RESP_DIR}/tools/MultiRelay/bin/Syssvc.exe" -municode >/dev/null 2>&1 \
+            && _ok "mingw: Syssvc.exe" || _err "mingw: Syssvc.exe"
+
+        "${RESP_DIR}/certs/gen-self-signed-cert.sh" >/dev/null 2>&1 \
+            && _ok "Responder: self-signed cert" || _err "Responder: self-signed cert"
+    fi
+
+    cat > "${KON_BIN}/Responder.py" << EOF
+#!/usr/bin/env bash
+cd "${RESP_DIR}" && exec ./venv/bin/python3 ./Responder.py "\$@"
+EOF
+    chmod +x "${KON_BIN}/Responder.py"
+
+    _ok "Responder.py → ${KON_BIN}/Responder.py"
 }
 
 function install_petitpotam() {
-    install_git PetitPotam https://github.com/topotam/PetitPotam
-    link_bin PetitPotam.py "${KON_SRC}/PetitPotam/PetitPotam.py"
+    local PP_ALT_DIR="${KON_SRC}/PetitPotam_alt"
+    local PP_DIR="${KON_SRC}/PetitPotam"
+
+    # Original (topotam) → carpeta principal.
+    if [[ -d "${PP_DIR}" ]]; then
+        _info "skip: PetitPotam (already exists)"
+    else
+        git clone -q --depth 1 https://github.com/topotam/PetitPotam "${PP_DIR}" >/dev/null 2>&1 \
+            || { _err "git: PetitPotam"; return 1; }
+
+        python3 -m venv --system-site-packages "${PP_DIR}/venv" >/dev/null 2>&1
+        "${PP_DIR}/venv/bin/pip3" install -q --no-cache-dir impacket >/dev/null 2>&1 \
+            && _ok "pip: impacket [PetitPotam venv]" || _err "pip: impacket [PetitPotam venv]"
+    fi
+
+    cat > "${KON_BIN}/PetitPotam.py" << EOF
+#!/usr/bin/env bash
+cd "${PP_DIR}" && exec ./venv/bin/python3 ./PetitPotam.py "\$@"
+EOF
+    chmod +x "${KON_BIN}/PetitPotam.py"
+
+    _ok "PetitPotam.py → ${KON_BIN}/PetitPotam.py (topotam, original)"
+
 }
 
 function install_dfscoerce() {
@@ -223,24 +378,94 @@ function install_zerologon() {
 }
 
 function install_noPac() {
-    install_git noPac https://github.com/Ridter/noPac
-    link_bin noPac.py "${KON_SRC}/noPac/noPac.py"
-    link_bin noPac-scanner.py "${KON_SRC}/noPac/scanner.py"
+    local NOPAC_DIR="${KON_SRC}/noPac"
+
+    if [[ -d "${NOPAC_DIR}" ]]; then
+        _info "skip: noPac (already exists)"
+    else
+        git clone -q --depth 1 https://github.com/Ridter/noPac "${NOPAC_DIR}" >/dev/null 2>&1 \
+            || { _err "git: noPac"; return 1; }
+
+        python3 -m venv --system-site-packages "${NOPAC_DIR}/venv" >/dev/null 2>&1
+        "${NOPAC_DIR}/venv/bin/pip3" install -q --no-cache-dir -r "${NOPAC_DIR}/requirements.txt" >/dev/null 2>&1 \
+            && _ok "pip: noPac requirements [venv]" || _err "pip: noPac requirements [venv]"
+    fi
+
+    cat > "${KON_BIN}/noPac.py" << EOF
+#!/usr/bin/env bash
+cd "${NOPAC_DIR}" && exec ./venv/bin/python3 ./noPac.py "\$@"
+EOF
+    chmod +x "${KON_BIN}/noPac.py"
+
+    cat > "${KON_BIN}/noPac-scanner.py" << EOF
+#!/usr/bin/env bash
+cd "${NOPAC_DIR}" && exec ./venv/bin/python3 ./scanner.py "\$@"
+EOF
+    chmod +x "${KON_BIN}/noPac-scanner.py"
+
+    _ok "noPac.py → ${KON_BIN}/noPac.py"
+    _ok "noPac-scanner.py → ${KON_BIN}/noPac-scanner.py"
 }
 
-function install_pykek() {
-    install_git pykek https://github.com/preempt/pykek
-    link_bin ms14-068.py "${KON_SRC}/pykek/ms14-068.py"
-}
 
 function install_windapsearch() {
-    install_git windapsearch https://github.com/ropnop/windapsearch
-    link_bin windapsearch.py "${KON_SRC}/windapsearch/windapsearch.py"
+    local WDS_DIR="${KON_SRC}/windapsearch"
+ 
+    install_apt libldap2-dev
+    install_apt libsasl2-dev
+ 
+    # --- Reparación de estado corrupto de una corrida anterior ---
+    # Una versión vieja de este instalador hacía 'link_bin windapsearch.py ...',
+    # dejando KON_BIN/windapsearch.py como SYMLINK al script real del repo.
+    # Si una corrida posterior hace 'cat > KON_BIN/windapsearch.py' sin romper
+    # el symlink primero, bash escribe A TRAVÉS del link y pisa el script real
+    # en KON_SRC con el contenido del wrapper. Si detectamos ese símlink viejo,
+    # lo borramos (no el destino) y si el destino quedó corrupto, recloneamos.
+    if [[ -L "${KON_BIN}/windapsearch.py" ]]; then
+        rm -f "${KON_BIN}/windapsearch.py"
+    fi
+    if [[ -f "${WDS_DIR}/windapsearch.py" ]] && ! head -1 "${WDS_DIR}/windapsearch.py" | grep -q '^#!/usr/bin/env python'; then
+        _info "windapsearch: repo source corrupted by previous run, re-cloning"
+        rm -rf "${WDS_DIR}"
+    fi
+ 
+    if [[ -d "${WDS_DIR}" ]]; then
+        _info "skip: windapsearch (already exists)"
+    else
+        git clone -q --depth 1 https://github.com/ropnop/windapsearch "${WDS_DIR}" >/dev/null 2>&1 \
+            || { _err "git: windapsearch"; return 1; }
+ 
+        python3 -m venv --system-site-packages "${WDS_DIR}/venv" >/dev/null 2>&1
+        if [[ -f "${WDS_DIR}/requirements.txt" ]]; then
+            "${WDS_DIR}/venv/bin/pip3" install -q --no-cache-dir -r "${WDS_DIR}/requirements.txt" >/dev/null 2>&1 \
+                && _ok "pip: windapsearch requirements.txt [venv]" \
+                || _err "pip: windapsearch requirements.txt [venv]"
+        else
+            # Fallback por si el repo cambia de estructura y deja de traer requirements.txt.
+            "${WDS_DIR}/venv/bin/pip3" install -q --no-cache-dir python-ldap >/dev/null 2>&1 \
+                && _ok "pip: python-ldap [venv]" || _err "pip: python-ldap [venv]"
+        fi
+    fi
+ 
+    # rm -f antes de escribir: nunca confiar en que '>' / 'cat >' rompa un symlink
+    # viejo por sí solo. Esta es la regla general que evita el bug de arriba.
+    rm -f "${KON_BIN}/windapsearch.py"
+    cat > "${KON_BIN}/windapsearch.py" << EOF
+#!/usr/bin/env bash
+cd "${WDS_DIR}" && exec ./venv/bin/python3 ./windapsearch.py "\$@"
+EOF
+    chmod +x "${KON_BIN}/windapsearch.py"
+ 
+    if "${KON_BIN}/windapsearch.py" -h >/tmp/windapsearch_check.log 2>&1; then
+        _ok "windapsearch.py → ${KON_BIN}/windapsearch.py"
+    else
+        _err "windapsearch.py: wrapper created but tool failed to run"
+        _info "output:"
+        sed 's/^/         /' /tmp/windapsearch_check.log
+    fi
+    rm -f /tmp/windapsearch_check.log
 }
 
-function install_ldapnomnom() {
-    install_git ldapnomnom https://github.com/lkarlslund/ldapnomnom
-}
 
 function install_targetedkerberoast() {
     install_git targetedKerberoast https://github.com/ShutdownRepo/targetedKerberoast
@@ -248,18 +473,98 @@ function install_targetedkerberoast() {
 }
 
 function install_krbrelayx() {
-    install_git krbrelayx https://github.com/dirkjanm/krbrelayx
-    link_bin krbrelayx.py "${KON_SRC}/krbrelayx/krbrelayx.py"
-    link_bin dnstool.py "${KON_SRC}/krbrelayx/dnstool.py"
-    link_bin printerbug.py "${KON_SRC}/krbrelayx/printerbug.py"
-    link_bin addspn.py "${KON_SRC}/krbrelayx/addspn.py"
+    local KRB_DIR="${KON_SRC}/krbrelayx"
+
+    if [[ -d "${KRB_DIR}" ]]; then
+        _info "skip: krbrelayx (already exists)"
+    else
+        git clone -q --depth 1 https://github.com/dirkjanm/krbrelayx "${KRB_DIR}" >/dev/null 2>&1 \
+            || { _err "git: krbrelayx"; return 1; }
+
+        python3 -m venv --system-site-packages "${KRB_DIR}/venv" >/dev/null 2>&1
+        "${KRB_DIR}/venv/bin/pip3" install -q --no-cache-dir dnspython ldap3 impacket dsinternals >/dev/null 2>&1 \
+            && _ok "pip: krbrelayx deps [venv]" || _err "pip: krbrelayx deps [venv]"
+    fi
+
+    local script
+    for script in krbrelayx dnstool printerbug addspn; do
+        cat > "${KON_BIN}/${script}.py" << EOF
+#!/usr/bin/env bash
+cd "${KRB_DIR}" && exec ./venv/bin/python3 ./${script}.py "\$@"
+EOF
+        chmod +x "${KON_BIN}/${script}.py"
+        _ok "${script}.py → ${KON_BIN}/${script}.py"
+    done
+}
+function install_pkinittools() {
+    local PKT_DIR="${KON_SRC}/PKINITtools"
+ 
+    if [[ -d "${PKT_DIR}" ]]; then
+        _info "skip: PKINITtools repo (already exists)"
+    else
+        git clone -q --depth 1 https://github.com/dirkjanm/PKINITtools "${PKT_DIR}" >/dev/null 2>&1 \
+            || { _err "git: PKINITtools"; return 1; }
+    fi
+ 
+    if [[ ! -d "${PKT_DIR}/venv" ]]; then
+        python3 -m venv --system-site-packages "${PKT_DIR}/venv" >/dev/null 2>&1
+    fi
+ 
+    "${PKT_DIR}/venv/bin/pip3" install -q --no-cache-dir -r "${PKT_DIR}/requirements.txt" >/dev/null 2>&1 \
+        && _ok "pip: PKINITtools requirements [venv]" || _err "pip: PKINITtools requirements [venv]"
+ 
+    # --- Fix de oscrypto / libcrypto ---
+    # El paquete oscrypto publicado en PyPI no detecta bien la versión de libcrypto
+    # en distros recientes (Debian bookworm+ con openssl 3.x), y revienta con:
+    #   oscrypto.errors.LibraryNotFoundError: Error detecting the version of libcrypto
+    # Fix conocido: instalar oscrypto directo desde el repo (rama master, con el fix).
+    # Ver: https://github.com/wbond/oscrypto/issues/78
+    #
+    # NOTA: este fix se aplica SIEMPRE, sin depender de chequeos de fecha externos
+    # (no hay certeza sobre la semántica de check_temp_fix_expiry en este entorno).
+    # Cuando oscrypto publique un release nuevo en PyPI con el fix, esta línea de
+    # más abajo puede simplificarse a 'install pip oscrypto' normal otra vez.
+    "${PKT_DIR}/venv/bin/pip3" install -q --no-cache-dir --force-reinstall --no-deps \
+        "git+https://github.com/wbond/oscrypto.git" >/dev/null 2>&1 \
+        && _ok "pip: oscrypto (fix libcrypto, from git) [venv]" \
+        || _err "pip: oscrypto (fix libcrypto, from git) [venv]"
+ 
+    rm -f "${KON_BIN}/gettgtpkinit.py" "${KON_BIN}/getnthash.py"
+ 
+    cat > "${KON_BIN}/gettgtpkinit.py" << EOF
+#!/usr/bin/env bash
+cd "${PKT_DIR}" && exec ./venv/bin/python3 ./gettgtpkinit.py "\$@"
+EOF
+    chmod +x "${KON_BIN}/gettgtpkinit.py"
+ 
+    cat > "${KON_BIN}/getnthash.py" << EOF
+#!/usr/bin/env bash
+cd "${PKT_DIR}" && exec ./venv/bin/python3 ./getnthash.py "\$@"
+EOF
+    chmod +x "${KON_BIN}/getnthash.py"
+ 
+    _ok "gettgtpkinit.py → ${KON_BIN}/gettgtpkinit.py"
+    _ok "getnthash.py → ${KON_BIN}/getnthash.py"
+ 
+    # --- Self-test ---
+    # gettgtpkinit.py/getnthash.py no tienen un modo "version" liviano; lo más
+    # cercano sin argumentos reales es invocar con -h y chequear que NO truene
+    # con el traceback de oscrypto (que pasa en el import, antes de parsear args).
+    local test_log="/tmp/pkinittools_check.log"
+    if "${KON_BIN}/gettgtpkinit.py" -h >"${test_log}" 2>&1; then
+        _ok "self-test: gettgtpkinit.py -h → OK (oscrypto import funciona)"
+    else
+        if grep -q "LibraryNotFoundError" "${test_log}"; then
+            _err "self-test: gettgtpkinit.py sigue roto (oscrypto/libcrypto)"
+        else
+            _err "self-test: gettgtpkinit.py falló por otro motivo"
+        fi
+        _info "output:"
+        sed 's/^/         /' "${test_log}"
+    fi
+    rm -f "${test_log}"
 }
 
-function install_pkinittools() {
-    install_git PKINITtools https://github.com/dirkjanm/PKINITtools
-    link_bin gettgtpkinit.py "${KON_SRC}/PKINITtools/gettgtpkinit.py"
-    link_bin getnthash.py "${KON_SRC}/PKINITtools/getnthash.py"
-}
 
 function install_pywhisker() {
     install_git pywhisker https://github.com/ShutdownRepo/pywhisker
@@ -325,10 +630,8 @@ function package_ad() {
     install_dfscoerce
     install_shadowcoerce
     install_zerologon
-    install_noPac
-    install_pykek
+    install_noPac    
     install_windapsearch
-    install_ldapnomnom
     install_targetedkerberoast
     install_krbrelayx
     install_pkinittools
