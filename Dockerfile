@@ -13,8 +13,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # ── [L1] Base APT packages ──────────────────────────────────────────────
 # Changes rarely. If it changes, everything rebuilds — acceptable.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash ca-certificates curl wget git gnupg locate\
-    python3 python3-pip iproute2 iputils-ping nano\
+    bash ca-certificates curl wget git gnupg locate unzip\
+    python3 python3-pip iproute2 iputils-ping nano tree\
     dnsutils net-tools procps locales tzdata ntpdate\
     less vim sudo openssh-client \
     build-essential gcc libssl-dev libffi-dev \
@@ -81,6 +81,17 @@ RUN chmod +x /kon/install/package_wordlists.sh && \
              source /kon/install/package_wordlists.sh && \
              package_wordlists' && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ── [L11] package_binaries ────────────────────────────────────────────────
+# Herramientas binarias (Rubeus, mimikatz, chisel, etc.)
+COPY install/package_binaries.sh /kon/install/package_binaries.sh
+RUN chmod +x /kon/install/package_binaries.sh && \
+     apt-get update && \
+     bash -c 'source /kon/install/common.sh && \
+              source /kon/install/package_binaries.sh && \
+              package_binaries' && \
+     apt-get clean && rm -rf /var/lib/apt/lists/*
+
 
 # ── [L8] package_ad (DESACTIVADO) ────────────────────────────────────────
 # AD tools: stable, but more complex than wordlists.
