@@ -56,22 +56,22 @@ COPY install/common.sh /kon/install/common.sh
 RUN chmod +x /kon/install/common.sh
 
 #Layer 6: Run package_recon
-#COPY install/package_recon.sh /kon/install/package_recon.sh
-#RUN chmod +x /kon/install/package_recon.sh && \
-#   apt-get update && \
-#   bash -c 'source /kon/install/common.sh && \
-#            source /kon/install/package_recon.sh && \
-#            package_recon' && \
-#   apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/package_recon.sh /kon/install/package_recon.sh
+RUN chmod +x /kon/install/package_recon.sh && \
+   apt-get update && \
+   bash -c 'source /kon/install/common.sh && \
+            source /kon/install/package_recon.sh && \
+            package_recon' && \
+   apt-get clean && rm -rf /var/lib/apt/lists/*
 
 #Layer 7: Run package_wordlists
-#COPY install/package_wordlists.sh /kon/install/package_wordlists.sh
-#RUN chmod +x /kon/install/package_wordlists.sh && \
-#    apt-get update && \
-#    bash -c 'source /kon/install/common.sh && \
-#             source /kon/install/package_wordlists.sh && \
-#             package_wordlists' && \
-#    apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/package_wordlists.sh /kon/install/package_wordlists.sh
+RUN chmod +x /kon/install/package_wordlists.sh && \
+    apt-get update && \
+    bash -c 'source /kon/install/common.sh && \
+             source /kon/install/package_wordlists.sh && \
+             package_wordlists' && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 #Layer 11: Run package_binaries
 COPY install/package_binaries.sh /kon/install/package_binaries.sh
@@ -83,13 +83,13 @@ RUN chmod +x /kon/install/package_binaries.sh && \
      apt-get clean && rm -rf /var/lib/apt/lists/*
 
 #Layer 8: Run package_ad
-#COPY install/package_ad.sh /kon/install/package_ad.sh
-#RUN chmod +x /kon/install/package_ad.sh && \
-#    apt-get update && \
-#    bash -c 'source /kon/install/common.sh && \
-#              source /kon/install/package_ad.sh && \
-#             package_ad' && \
-#    apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/package_ad.sh /kon/install/package_ad.sh
+RUN chmod +x /kon/install/package_ad.sh && \
+    apt-get update && \
+    bash -c 'source /kon/install/common.sh && \
+              source /kon/install/package_ad.sh && \
+             package_ad' && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 #Layer 9: Run package_infra
 COPY install/package_infra.sh /kon/install/package_infra.sh
@@ -101,13 +101,13 @@ RUN chmod +x /kon/install/package_infra.sh && \
      apt-get clean && rm -rf /var/lib/apt/lists/*
 
 #Layer 10: Run package_web
-#COPY install/package_web.sh /kon/install/package_web.sh
-#RUN chmod +x /kon/install/package_web.sh && \
-#     apt-get update && \
-#     bash -c 'source /kon/install/common.sh && \
-#              source /kon/install/package_web.sh && \
-#              package_web' && \
-#     apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/package_web.sh /kon/install/package_web.sh
+RUN chmod +x /kon/install/package_web.sh && \
+     apt-get update && \
+     bash -c 'source /kon/install/common.sh && \
+              source /kon/install/package_web.sh && \
+              package_web' && \
+     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 #Layer 11: Copy assets and version
 COPY assets/ /kon/assets/

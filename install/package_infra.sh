@@ -1,6 +1,33 @@
 #!/usr/bin/env bash
 source /kon/install/common.sh
 mkdir -p /anvil /opt/tools
+# Asegura que pipx esté disponible, probando varias rutas antes de rendirse.
+function _ensure_pipx() {
+    if command -v pipx >/dev/null 2>&1; then
+        return 0
+    fi
+
+    _info "pipx no encontrado, intentando instalar"
+
+    # Intento 1: apt (refrescando índice primero, por si la capa no lo tiene)
+    apt-get update -y >/dev/null 2>&1
+    if install_apt pipx && command -v pipx >/dev/null 2>&1; then
+        return 0
+    fi
+
+    # Intento 2: pip --user (usa el python del pyenv que ya está activo)
+    _info "apt falló, intentando con pip --user"
+    pip3 install -q --no-cache-dir --user pipx >/dev/null 2>&1
+    export PATH="$HOME/.local/bin:$PATH"
+    if command -v pipx >/dev/null 2>&1; then
+        _ok "pip: pipx (--user)"
+        return 0
+    fi
+
+    _err "pipx: no se pudo instalar por ningún método"
+    return 1
+}
+
 
 _gh_find_asset() {
     local repo="$1" expr="$2"
@@ -276,104 +303,6 @@ function install_pwncat() {
         pwncat-vl --help 2>&1 | tail -15
     fi
 }
-function install_havoc() {
-    colorecho "Installing Havoc"
-
-    local dest="${KON_SRC}/Havoc"
-
-    # ── Clonar repositorio (con submódulos, shallow) ──
-    if [[ -d "${dest}" ]]; then
-        _info "Havoc repo ya existe, eliminando antes de re-clonar"
-        rm -rf "${dest}"
-    fi
-
-    local log rc
-    log=$(git clone --depth 1 --recursive --shallow-submodules \
-        https://github.com/HavocFramework/Havoc "${dest}" 2>&1)
-    rc=$?
-    if [[ ${rc} -eq 0 ]]; then
-        _ok "git: Havoc → ${dest}"
-    else
-        _err "git: Havoc (rc=${rc})"
-        echo "----- output -----"; echo "${log}" | tail -20; echo "-------------------"
-        return 1
-    fi
-
-    cd "${dest}" || { _err "cd: ${dest}"; return 1; }
-
-    # ── Building Team Server ──
-    sed -i 's/golang-go//' teamserver/Install.sh
-
-    # https://github.com/HavocFramework/Havoc/issues/312
-    # `make ts-build` corre teamserver/Install.sh, que descarga con
-    # `wget -q` dos toolchains musl-cross desde musl.cc:
-    #   /tmp/mingw-musl-64.tgz  y  /tmp/mingw-musl-32.tgz
-    # Si la red corta a medias, queda un .tgz truncado que `make clean`
-    # NO borra, y cada intento posterior reutiliza ese mismo archivo roto.
-    local attempt
-    rc=1
-    for attempt in 1 2 3; do
-        rm -f /tmp/mingw-musl-64.tgz /tmp/mingw-musl-32.tgz
-        log=$(make ts-build 2>&1)
-        rc=$?
-        if [[ ${rc} -eq 0 ]]; then
-            break
-        fi
-        _info "make ts-build falló (intento ${attempt}/3), borrando .tgz truncados (musl.cc) y reintentando"
-        sleep 3
-    done
-
-    if [[ ${rc} -eq 0 ]]; then
-        _ok "make: ts-build"
-    else
-        _err "make: ts-build (rc=${rc}) tras 3 intentos"
-        echo "----- output -----"; echo "${log}" | tail -40; echo "-------------------"
-        _info "si persiste, revisar conectividad a musl.cc (puede estar caído/inestable):"
-        _info "  curl -sI https://musl.cc/x86_64-w64-mingw32-cross.tgz"
-        return 1
-    fi
-
-    # ── Building Client ──
-    install_apt qtmultimedia5-dev
-    install_apt libqt5websockets5-dev
-
-    log=$(make client-build 2>&1)
-    rc=$?
-    if [[ ${rc} -eq 0 ]]; then
-        _ok "make: client-build"
-    else
-        _err "make: client-build (rc=${rc})"
-        echo "----- output -----"; echo "${log}" | tail -40; echo "-------------------"
-        if [[ -f "${dest}/client/Build/CMakeFiles/CMakeOutput.log" ]]; then
-            echo "----- CMakeOutput.log (tail) -----"
-            tail -40 "${dest}/client/Build/CMakeFiles/CMakeOutput.log"
-            echo "-----------------------------------"
-        fi
-        return 1
-    fi
-
-    # `make clean` elimina los binarios igual, así que solo borramos el
-    # directorio de build del client para liberar espacio.
-    rm -rf "${dest}/client/Build/"
-
-    # ── Wrapper en bin/ ──
-    # No usamos symlink directo: Havoc resuelve rutas relativas (profiles/,
-    # data/, etc.) respecto al directorio desde donde se ejecuta, así que
-    # un symlink plano rompería todo si se corre desde otro cwd.
-    cat > "${KON_BIN}/havoc" << EOF
-#!/usr/bin/env bash
-cd "${dest}" && exec ./havoc "\$@"
-EOF
-    chmod +x "${KON_BIN}/havoc"
-    _ok "bin: havoc → ${KON_BIN}/havoc (wrapper, cd a ${dest})"
-
-    # ── Verificar ──
-    if [[ -x "${dest}/havoc" ]] && [[ -x "${KON_BIN}/havoc" ]]; then
-        _ok "havoc: instalado correctamente 🎉 (havoc server --profile ...)"
-    else
-        _err "havoc: verificación falló (binario o wrapper no encontrado)"
-    fi
-}
 
 function install_metasploit() {
     echo -e "  ${CYAN}git${RESET} metasploit-framework"
@@ -476,7 +405,6 @@ function package_infra() {
     install_ligolo
 
     install_villain
-    install_havoc
     install_pwncat
     install_sliver
     install_metasploit
