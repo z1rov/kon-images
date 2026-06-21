@@ -176,48 +176,116 @@ function install_invoke_obfuscation() {
         "Invoke-Obfuscation.psm1"
 }
 
-# ── Pivoting (binario también usable directo en este contenedor) ───────────
-function install_chisel() {
-    echo -e "  ${CYAN}forja${RESET} chisel"
-    local url
-    url=$(curl -s https://api.github.com/repos/jpillora/chisel/releases/latest \
-        | grep "browser_download_url.*linux_amd64\.gz\"" \
-        | grep -o 'https://[^"]*' | head -1)
-    if [[ -z "${url}" ]]; then
-        _err "chisel: no release found"
+# ── Pivoting: .exe de Windows para servir a targets ─────────────────────────
+# Los binarios Linux de chisel/ligolo (para uso interno del contenedor) se
+# instalan en package_infra.sh (install_chisel / install_ligolo). Acá solo
+# bajamos los .exe de Windows, igual que el resto de forja/.
+function install_chisel_win() {
+    echo -e "  ${CYAN}forja${RESET} chisel (windows)"
+    local forja_dir="${KON_FORJA}/chisel"
+    mkdir -p "${forja_dir}"
+
+    install_apt unzip
+
+    local version
+    version=$(python3 - << 'PYEOF'
+import urllib.request, json, ssl
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+req = urllib.request.Request(
+    "https://api.github.com/repos/jpillora/chisel/releases/latest",
+    headers={"User-Agent": "curl/7.0"})
+with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
+    print(json.load(r)["tag_name"].lstrip("v"))
+PYEOF
+)
+
+    if [[ -z "${version}" ]]; then
+        _err "chisel (windows): no se pudo obtener la version del release"
         return
     fi
-    local dest_dir="${KON_FORJA}/chisel"
-    mkdir -p "${dest_dir}"
-    curl -sL "${url}" | gunzip > "${dest_dir}/chisel" 2>/dev/null
-    if [[ -s "${dest_dir}/chisel" ]]; then
-        chmod +x "${dest_dir}/chisel"
-        link_bin chisel "${dest_dir}/chisel"
+
+    local base="https://github.com/jpillora/chisel/releases/download/v${version}"
+    local tmp
+    tmp=$(mktemp -d)
+
+    curl -sL -o "${tmp}/chisel_windows.zip" \
+        "${base}/chisel_${version}_windows_amd64.zip"
+    mkdir -p "${tmp}/win"
+    unzip -q "${tmp}/chisel_windows.zip" -d "${tmp}/win" 2>/dev/null
+    local win_bin
+    win_bin=$(find "${tmp}/win" -maxdepth 3 -type f -name "*.exe" | head -1)
+    if [[ -n "${win_bin}" ]]; then
+        cp "${win_bin}" "${forja_dir}/chisel_windows_amd64.exe"
+        _ok "forja: chisel (windows/amd64) → ${forja_dir}/chisel_windows_amd64.exe"
     else
-        _err "forja: chisel"
+        _err "forja: chisel (windows/amd64) — exe no encontrado en zip"
     fi
+
+    rm -rf "${tmp}"
 }
 
-function install_ligolo() {
-    echo -e "  ${CYAN}forja${RESET} ligolo"
-    local url
-    url=$(curl -s https://api.github.com/repos/nicocha30/ligolo-ng/releases/latest \
-        | grep "browser_download_url.*linux_amd64\.tar\.gz\"" \
-        | grep -o 'https://[^"]*' | head -1)
-    if [[ -z "${url}" ]]; then
-        _err "ligolo: no release found"
+function install_ligolo_win() {
+    echo -e "  ${CYAN}forja${RESET} ligolo-ng (windows)"
+    local forja_dir="${KON_FORJA}/ligolo"
+    mkdir -p "${forja_dir}"
+
+    install_apt unzip
+
+    local version
+    version=$(python3 - << 'PYEOF'
+import urllib.request, json, ssl
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+req = urllib.request.Request(
+    "https://api.github.com/repos/nicocha30/ligolo-ng/releases/latest",
+    headers={"User-Agent": "curl/7.0"})
+with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
+    print(json.load(r)["tag_name"].lstrip("v"))
+PYEOF
+)
+
+    if [[ -z "${version}" ]]; then
+        _err "ligolo-ng (windows): no se pudo obtener la version del release"
         return
     fi
-    local dest_dir="${KON_FORJA}/ligolo"
-    mkdir -p "${dest_dir}"
-    curl -sL "${url}" | tar -xz -C "${dest_dir}" 2>/dev/null
-    if [[ -f "${dest_dir}/proxy" ]]; then
-        chmod +x "${dest_dir}/proxy"
-        link_bin ligolo-proxy "${dest_dir}/proxy"
-        _ok "forja: ligolo"
+
+    local base="https://github.com/nicocha30/ligolo-ng/releases/download/v${version}"
+    local tmp
+    tmp=$(mktemp -d)
+
+    # ── Windows agent x64 ─────────────────────────────────────────────
+    curl -sL -o "${tmp}/agent_windows.zip" \
+        "${base}/ligolo-ng_agent_${version}_windows_amd64.zip"
+    mkdir -p "${tmp}/agent_win"
+    unzip -q "${tmp}/agent_windows.zip" -d "${tmp}/agent_win" 2>/dev/null
+    local agent_win
+    agent_win=$(find "${tmp}/agent_win" -maxdepth 3 -type f -name "*.exe" | head -1)
+    if [[ -n "${agent_win}" ]]; then
+        cp "${agent_win}" "${forja_dir}/ligolo-agent_windows_amd64.exe"
+        _ok "forja: ligolo-agent (windows/amd64) → ${forja_dir}/ligolo-agent_windows_amd64.exe"
     else
-        _err "forja: ligolo"
+        _err "forja: ligolo-agent (windows/amd64) — exe no encontrado en zip"
     fi
+    rm -rf "${tmp:?}"/*
+
+    # ── Windows proxy x64 ─────────────────────────────────────────────
+    curl -sL -o "${tmp}/proxy_windows.zip" \
+        "${base}/ligolo-ng_proxy_${version}_windows_amd64.zip"
+    mkdir -p "${tmp}/proxy_win"
+    unzip -q "${tmp}/proxy_windows.zip" -d "${tmp}/proxy_win" 2>/dev/null
+    local proxy_win
+    proxy_win=$(find "${tmp}/proxy_win" -maxdepth 3 -type f -name "*.exe" | head -1)
+    if [[ -n "${proxy_win}" ]]; then
+        cp "${proxy_win}" "${forja_dir}/ligolo-proxy_windows_amd64.exe"
+        _ok "forja: ligolo-proxy (windows/amd64) → ${forja_dir}/ligolo-proxy_windows_amd64.exe"
+    else
+        _err "forja: ligolo-proxy (windows/amd64) — exe no encontrado en zip"
+    fi
+
+    rm -rf "${tmp}"
 }
 
 # ── Package runner ──────────────────────────────────────────────────────────
@@ -248,6 +316,10 @@ function package_binaries() {
 
     # Netcat
     install_ncwin
+
+    # Pivoting (.exe Windows; binarios linux van en package_infra.sh)
+    install_chisel_win
+    install_ligolo_win
 
     # Otras herramientas Windows
     install_plink

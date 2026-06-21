@@ -69,8 +69,6 @@ function install_sshuttle() { install_apt sshuttle; }
 
 function install_chisel() {
     echo -e "  ${CYAN}bin${RESET} chisel"
-    local forja_dir="${KON_FORJA}/chisel"
-    mkdir -p "${forja_dir}"
 
     install_apt unzip
 
@@ -99,7 +97,7 @@ PYEOF
     local tmp
     tmp=$(mktemp -d)
 
-    # ── Linux amd64 (.gz simple, no tar) ───────────────────────────────
+    # ── Linux amd64 (.gz simple, no tar) — único target de este script ──
     curl -sL -o "${tmp}/chisel_linux.gz" \
         "${base}/chisel_${version}_linux_amd64.gz"
     gunzip -f "${tmp}/chisel_linux.gz" 2>/dev/null
@@ -110,29 +108,14 @@ PYEOF
     else
         _err "bin: chisel (linux/amd64) — binario no encontrado"
     fi
-    rm -rf "${tmp:?}"/*
-
-    # ── Windows amd64 (.zip) ───────────────────────────────────────────
-    curl -sL -o "${tmp}/chisel_windows.zip" \
-        "${base}/chisel_${version}_windows_amd64.zip"
-    mkdir -p "${tmp}/win"
-    unzip -q "${tmp}/chisel_windows.zip" -d "${tmp}/win" 2>/dev/null
-    local win_bin
-    win_bin=$(find "${tmp}/win" -maxdepth 3 -type f -name "*.exe" | head -1)
-    if [[ -n "${win_bin}" ]]; then
-        cp "${win_bin}" "${forja_dir}/chisel_windows_amd64.exe"
-        _ok "forja: chisel (windows/amd64) → ${forja_dir}/chisel_windows_amd64.exe"
-    else
-        _err "forja: chisel (windows/amd64) — exe no encontrado en zip"
-    fi
 
     rm -rf "${tmp}"
+    # Nota: el .exe de Windows se descarga en package_binaries.sh
+    # (install_chisel_win), junto al resto de binarios para servir a targets.
 }
 
 function install_ligolo() {
     echo -e "  ${CYAN}bin${RESET} ligolo-ng"
-    local forja_dir="${KON_FORJA}/ligolo"
-    mkdir -p "${forja_dir}"
 
     install_apt unzip
 
@@ -197,38 +180,10 @@ PYEOF
     else
         _err "bin: ligolo-proxy (linux/amd64) — binario no encontrado en tar"
     fi
-    rm -rf "${tmp:?}"/*
-
-    # ── Windows agent x64 ─────────────────────────────────────────────
-    curl -sL -o "${tmp}/agent_windows.zip" \
-        "${base}/ligolo-ng_agent_${version}_windows_amd64.zip"
-    mkdir -p "${tmp}/agent_win"
-    unzip -q "${tmp}/agent_windows.zip" -d "${tmp}/agent_win" 2>/dev/null
-    local agent_win
-    agent_win=$(find "${tmp}/agent_win" -maxdepth 3 -type f -name "*.exe" | head -1)
-    if [[ -n "${agent_win}" ]]; then
-        cp "${agent_win}" "${forja_dir}/ligolo-agent_windows_amd64.exe"
-        _ok "forja: ligolo-agent (windows/amd64) → ${forja_dir}/ligolo-agent_windows_amd64.exe"
-    else
-        _err "forja: ligolo-agent (windows/amd64) — exe no encontrado en zip"
-    fi
-    rm -rf "${tmp:?}"/*
-
-    # ── Windows proxy x64 ─────────────────────────────────────────────
-    curl -sL -o "${tmp}/proxy_windows.zip" \
-        "${base}/ligolo-ng_proxy_${version}_windows_amd64.zip"
-    mkdir -p "${tmp}/proxy_win"
-    unzip -q "${tmp}/proxy_windows.zip" -d "${tmp}/proxy_win" 2>/dev/null
-    local proxy_win
-    proxy_win=$(find "${tmp}/proxy_win" -maxdepth 3 -type f -name "*.exe" | head -1)
-    if [[ -n "${proxy_win}" ]]; then
-        cp "${proxy_win}" "${forja_dir}/ligolo-proxy_windows_amd64.exe"
-        _ok "forja: ligolo-proxy (windows/amd64) → ${forja_dir}/ligolo-proxy_windows_amd64.exe"
-    else
-        _err "forja: ligolo-proxy (windows/amd64) — exe no encontrado en zip"
-    fi
 
     rm -rf "${tmp}"
+    # Nota: los .exe de Windows (agent/proxy) se descargan en
+    # package_binaries.sh (install_ligolo_win).
 }
 
 function install_sliver() {
@@ -279,78 +234,145 @@ function install_villain() {
         _err "git: Villain (Villain.py not found)"
     fi
 }
+
 function install_pwncat() {
-    echo -e "  ${CYAN}pip${RESET} pwncat-cs"
+     colorecho "Installing pwncat-vl"
 
-    # Desinstalar instalación previa para empezar limpio
-    python3 -m pip uninstall -y --break-system-packages \
-        pwncat-cs ZODB ZODB3 ZEO zodburi persistent transaction BTrees \
-        zc.lockfile zodbpickle zope.interface zope.proxy zope.deferredimport \
-        2>/dev/null || true
+    _ensure_pipx || return 1
 
-    # Instalar desde el repo de GitHub (trae todas las deps correctas)
-    python3 -m pip install -q --no-cache-dir --break-system-packages \
-        "git+https://github.com/calebstewart/pwncat.git" 2>&1 | tail -10
-
-    # Fijar zodburi en el rango que pwncat-cs realmente requiere (<3.0.0)
-    python3 -m pip install -q --no-cache-dir --break-system-packages \
-        --force-reinstall "zodburi<3.0.0,>=2.5.0" 2>&1 | tail -5
-
-    if command -v pwncat-cs >/dev/null 2>&1; then
-        ln -sf "$(command -v pwncat-cs)" "${KON_BIN}/pwncat-cs" 2>/dev/null || true
-        _ok "pip: pwncat-cs → ${KON_BIN}/pwncat-cs"
+    # ── Instalar vía pipx ──
+    local log rc
+    log=$(pipx install --system-site-packages pwncat-vl 2>&1)
+    rc=$?
+    if [[ ${rc} -eq 0 ]]; then
+        _ok "pipx: pwncat-vl"
     else
-        _err "pip: pwncat-cs"
+        _err "pipx: pwncat-vl (rc=${rc})"
+        echo "----- output -----"
+        echo "${log}" | tail -20
+        echo "-------------------"
+        return 1
+    fi
+
+    # ── Downgrade cryptography (Blowfish deprecado) ──
+    # https://github.com/paramiko/paramiko/issues/2038
+    log=$(pipx inject pwncat-vl "cryptography==36.0.2" 2>&1)
+    rc=$?
+    if [[ ${rc} -eq 0 ]]; then
+        _ok "pipx: inject cryptography==36.0.2"
+    else
+        _err "pipx: inject cryptography==36.0.2 (rc=${rc})"
+        echo "----- output -----"
+        echo "${log}" | tail -10
+        echo "-------------------"
+        return 1
+    fi
+
+    # ── Verificar ──
+    if command -v pwncat-vl >/dev/null 2>&1 && pwncat-vl --help >/dev/null 2>&1; then
+        _ok "pwncat-vl: instalado correctamente 🎉"
+    else
+        _err "pwncat-vl: verificación falló"
+        pwncat-vl --help 2>&1 | tail -15
     fi
 }
-
 function install_havoc() {
-    echo -e "  ${CYAN}git${RESET} Havoc"
+    colorecho "Installing Havoc"
+
     local dest="${KON_SRC}/Havoc"
 
-    if [[ ! -d "${dest}" ]]; then
-        git clone -q --depth 1 --recursive --shallow-submodules \
-            https://github.com/HavocFramework/Havoc "${dest}" \
-            || { _err "git: Havoc (clone failed)"; return; }
+    # ── Clonar repositorio (con submódulos, shallow) ──
+    if [[ -d "${dest}" ]]; then
+        _info "Havoc repo ya existe, eliminando antes de re-clonar"
+        rm -rf "${dest}"
     fi
 
-    cd "${dest}" || return
+    local log rc
+    log=$(git clone --depth 1 --recursive --shallow-submodules \
+        https://github.com/HavocFramework/Havoc "${dest}" 2>&1)
+    rc=$?
+    if [[ ${rc} -eq 0 ]]; then
+        _ok "git: Havoc → ${dest}"
+    else
+        _err "git: Havoc (rc=${rc})"
+        echo "----- output -----"; echo "${log}" | tail -20; echo "-------------------"
+        return 1
+    fi
 
-    install_apt build-essential
-    install_apt cmake
-    install_apt libboost-all-dev
+    cd "${dest}" || { _err "cd: ${dest}"; return 1; }
+
+    # ── Building Team Server ──
+    sed -i 's/golang-go//' teamserver/Install.sh
+
+    # https://github.com/HavocFramework/Havoc/issues/312
+    # `make ts-build` corre teamserver/Install.sh, que descarga con
+    # `wget -q` dos toolchains musl-cross desde musl.cc:
+    #   /tmp/mingw-musl-64.tgz  y  /tmp/mingw-musl-32.tgz
+    # Si la red corta a medias, queda un .tgz truncado que `make clean`
+    # NO borra, y cada intento posterior reutiliza ese mismo archivo roto.
+    local attempt
+    rc=1
+    for attempt in 1 2 3; do
+        rm -f /tmp/mingw-musl-64.tgz /tmp/mingw-musl-32.tgz
+        log=$(make ts-build 2>&1)
+        rc=$?
+        if [[ ${rc} -eq 0 ]]; then
+            break
+        fi
+        _info "make ts-build falló (intento ${attempt}/3), borrando .tgz truncados (musl.cc) y reintentando"
+        sleep 3
+    done
+
+    if [[ ${rc} -eq 0 ]]; then
+        _ok "make: ts-build"
+    else
+        _err "make: ts-build (rc=${rc}) tras 3 intentos"
+        echo "----- output -----"; echo "${log}" | tail -40; echo "-------------------"
+        _info "si persiste, revisar conectividad a musl.cc (puede estar caído/inestable):"
+        _info "  curl -sI https://musl.cc/x86_64-w64-mingw32-cross.tgz"
+        return 1
+    fi
+
+    # ── Building Client ──
     install_apt qtmultimedia5-dev
     install_apt libqt5websockets5-dev
 
-    # teamserver — quitar golang-go del script de deps porque ya tenemos go en PATH
-    if [[ -f "teamserver/Install.sh" ]]; then
-        sed -i 's/\bgolang-go\b//' teamserver/Install.sh
-    fi
-    make ts-build 2>&1 | tail -3
-    if [[ -f "${dest}/havoc" ]]; then
-        _ok "build: havoc teamserver"
+    log=$(make client-build 2>&1)
+    rc=$?
+    if [[ ${rc} -eq 0 ]]; then
+        _ok "make: client-build"
     else
-        _err "build: havoc teamserver"
+        _err "make: client-build (rc=${rc})"
+        echo "----- output -----"; echo "${log}" | tail -40; echo "-------------------"
+        if [[ -f "${dest}/client/Build/CMakeFiles/CMakeOutput.log" ]]; then
+            echo "----- CMakeOutput.log (tail) -----"
+            tail -40 "${dest}/client/Build/CMakeFiles/CMakeOutput.log"
+            echo "-----------------------------------"
+        fi
+        return 1
     fi
 
-    make client-build 2>&1 | tail -3
-    if [[ -f "${dest}/havoc" ]]; then
-        _ok "build: havoc client"
-    fi
+    # `make clean` elimina los binarios igual, así que solo borramos el
+    # directorio de build del client para liberar espacio.
+    rm -rf "${dest}/client/Build/"
 
-    rm -rf "${dest}/client/Build/" 2>/dev/null || true
+    # ── Wrapper en bin/ ──
+    # No usamos symlink directo: Havoc resuelve rutas relativas (profiles/,
+    # data/, etc.) respecto al directorio desde donde se ejecuta, así que
+    # un symlink plano rompería todo si se corre desde otro cwd.
+    cat > "${KON_BIN}/havoc" << EOF
+#!/usr/bin/env bash
+cd "${dest}" && exec ./havoc "\$@"
+EOF
+    chmod +x "${KON_BIN}/havoc"
+    _ok "bin: havoc → ${KON_BIN}/havoc (wrapper, cd a ${dest})"
 
-    # Havoc usa rutas relativas internas → wrapper que cd al src
-    if [[ -f "${dest}/havoc" ]]; then
-        printf '#!/usr/bin/env bash\ncd "%s" && exec ./havoc "$@"\n' \
-            "${dest}" > "${KON_BIN}/havoc"
-        chmod +x "${KON_BIN}/havoc"
-        _ok "git: Havoc → ${KON_BIN}/havoc"
+    # ── Verificar ──
+    if [[ -x "${dest}/havoc" ]] && [[ -x "${KON_BIN}/havoc" ]]; then
+        _ok "havoc: instalado correctamente 🎉 (havoc server --profile ...)"
     else
-        _err "git: Havoc (build fallido — binario no encontrado)"
+        _err "havoc: verificación falló (binario o wrapper no encontrado)"
     fi
-
-    cd /anvil
 }
 
 function install_metasploit() {

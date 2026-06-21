@@ -113,6 +113,11 @@ function install_weevely() {
     install_apt weevely
 }
 
+function install_sqlmap() {
+    install_apt sqlmap
+}
+
+
 function install_whatweb() {
     colorecho "Installing WhatWeb"
 
@@ -1162,6 +1167,7 @@ function package_web() {
     install_ssrfmap
     install_gopherus
     install_nosqlmap
+    install_sqlmap
 
     install_xsstrike
     install_xspear
