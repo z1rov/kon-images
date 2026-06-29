@@ -1,107 +1,10 @@
 #!/usr/bin/env bash
-source /kon/install/common.sh
-mkdir -p /anvil /opt/tools
-
-# Asegura que pipx esté disponible, probando varias rutas antes de rendirse.
-function _ensure_pipx() {
-    # Sea cual sea el método de instalación, el PATH de la sesión actual
-    # no incluye ~/.local/bin hasta que se reinicia el shell (pipx solo
-    # lo agrega a futuras sesiones vía ensurepath). Lo exportamos siempre.
-    export PATH="$HOME/.local/bin:$PATH"
-
-    if command -v pipx >/dev/null 2>&1; then
-        return 0
-    fi
-
-    _info "pipx no encontrado, intentando instalar"
-
-    # Intento 1: apt (refrescando índice primero, por si la capa no lo tiene)
-    apt-get update -y >/dev/null 2>&1
-    if install_apt pipx && command -v pipx >/dev/null 2>&1; then
-        return 0
-    fi
-
-    # Intento 2: pip --user (usa el python del pyenv que ya está activo)
-    _info "apt falló, intentando con pip --user"
-    pip3 install -q --no-cache-dir --user pipx >/dev/null 2>&1
-    if command -v pipx >/dev/null 2>&1; then
-        _ok "pip: pipx (--user)"
-        return 0
-    fi
-
-    _err "pipx: no se pudo instalar por ningún método"
-    return 1
-}
-
-_gh_find_asset() {
-    local repo="$1" expr="$2"
-    python3 - "${repo}" "${expr}" << 'PYEOF'
-import sys, json, urllib.request, ssl
-
-repo = sys.argv[1]
-expr = sys.argv[2]
-
-ctx = ssl.create_default_context()
-ctx.check_hostname = False
-ctx.verify_mode = ssl.CERT_NONE
-
-def fetch(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "curl/7.0"})
-    with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
-        return json.load(r)
-
-endpoints = [
-    f"https://api.github.com/repos/{repo}/releases/latest",
-    f"https://api.github.com/repos/{repo}/releases?per_page=10",
-]
-
-for ep in endpoints:
-    try:
-        data = fetch(ep)
-        releases = data if isinstance(data, list) else [data]
-        for release in releases:
-            for asset in release.get("assets", []):
-                n = asset["name"]
-                try:
-                    if eval(expr):
-                        print(asset["browser_download_url"])
-                        sys.exit(0)
-                except Exception:
-                    pass
-    except Exception:
-        pass
-
-sys.exit(1)
-PYEOF
-}
-
-# debug helper: muestra todos los assets de un repo
-_gh_list_assets() {
-    local repo="$1"
-    python3 - "${repo}" << 'PYEOF'
-import sys, json, urllib.request, ssl
-repo = sys.argv[1]
-ctx = ssl.create_default_context()
-ctx.check_hostname = False
-ctx.verify_mode = ssl.CERT_NONE
-req = urllib.request.Request(
-    f"https://api.github.com/repos/{repo}/releases/latest",
-    headers={"User-Agent": "curl/7.0"})
-with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
-    data = json.load(r)
-for a in data.get("assets", []):
-    print(a["name"])
-PYEOF
-}
 
 function install_socat()    { install_apt socat; }
 function install_ncat()     { install_apt ncat; }
 function install_sshuttle() { install_apt sshuttle; }
 
 function install_chisel() {
-    echo -e "  ${CYAN}bin${RESET} chisel"
-
-    apt-get update -y >/dev/null 2>&1
     install_apt unzip
 
     local version
@@ -117,19 +20,15 @@ with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
     print(json.load(r)["tag_name"].lstrip("v"))
 PYEOF
 )
-
     if [[ -z "${version}" ]]; then
-        _err "chisel: no se pudo obtener la version del release"
-        return
+        _err "chisel: no se pudo obtener la version del release"; return 1
     fi
-
     _info "chisel version: ${version}"
-    local base="https://github.com/jpillora/chisel/releases/download/v${version}"
-    local tmp
-    tmp=$(mktemp -d)
 
-    curl -sL -o "${tmp}/chisel_linux.gz" \
-        "${base}/chisel_${version}_linux_amd64.gz"
+    local base="https://github.com/jpillora/chisel/releases/download/v${version}"
+    local tmp; tmp=$(mktemp -d)
+
+    curl -sL -o "${tmp}/chisel_linux.gz" "${base}/chisel_${version}_linux_amd64.gz"
     gunzip -f "${tmp}/chisel_linux.gz" 2>/dev/null
     if [[ -f "${tmp}/chisel_linux" ]]; then
         chmod +x "${tmp}/chisel_linux"
@@ -138,19 +37,12 @@ PYEOF
     else
         _err "bin: chisel (linux/amd64) — binario no encontrado"
     fi
-
     rm -rf "${tmp}"
-    # Nota: el .exe de Windows se descarga en package_binaries.sh
-    # (install_chisel_win), junto al resto de binarios para servir a targets.
 }
 
 function install_ligolo() {
-    colorecho "Installing ligolo-ng"
-
-    apt-get update -y >/dev/null 2>&1
     install_apt unzip
 
-    # ── Obtener version (con stderr visible si falla) ──
     local version version_err
     version=$(python3 - << 'PYEOF' 2>/tmp/ligolo_ver_err
 import urllib.request, json, ssl
@@ -164,23 +56,17 @@ with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
     print(json.load(r)["tag_name"].lstrip("v"))
 PYEOF
 )
-    version_err=$(cat /tmp/ligolo_ver_err 2>/dev/null)
-    rm -f /tmp/ligolo_ver_err
+    version_err=$(cat /tmp/ligolo_ver_err 2>/dev/null); rm -f /tmp/ligolo_ver_err
 
     if [[ -z "${version}" ]]; then
         _err "ligolo-ng: no se pudo obtener la version del release"
-        [[ -n "${version_err}" ]] && { echo "----- python error -----"; echo "${version_err}" | tail -10; echo "-------------------------"; }
         return 1
     fi
-
     _info "ligolo-ng version: ${version}"
-    local base="https://github.com/nicocha30/ligolo-ng/releases/download/v${version}"
-    local tmp
-    tmp=$(mktemp -d)
 
-    # ── Linux agent amd64 ──
-    # Validamos con `tar -tzf` (no depende del paquete `file`, que no
-    # está instalado en esta imagen).
+    local base="https://github.com/nicocha30/ligolo-ng/releases/download/v${version}"
+    local tmp; tmp=$(mktemp -d)
+
     local url="${base}/ligolo-ng_agent_${version}_linux_amd64.tar.gz"
     curl -sL -o "${tmp}/agent_linux.tar.gz" "${url}"
     if ! tar -tzf "${tmp}/agent_linux.tar.gz" >/dev/null 2>&1; then
@@ -199,7 +85,6 @@ PYEOF
     fi
     rm -rf "${tmp:?}"/*
 
-    # ── Linux proxy amd64 ──
     url="${base}/ligolo-ng_proxy_${version}_linux_amd64.tar.gz"
     curl -sL -o "${tmp}/proxy_linux.tar.gz" "${url}"
     if ! tar -tzf "${tmp}/proxy_linux.tar.gz" >/dev/null 2>&1; then
@@ -216,17 +101,11 @@ PYEOF
             _err "bin: ligolo-proxy — binario 'proxy' no encontrado tras extraer"
         fi
     fi
-
     rm -rf "${tmp}"
-    # Nota: los .exe de Windows (agent/proxy) se descargan en
-    # package_binaries.sh (install_ligolo_win).
 }
 
 function install_havoc() {
-    colorecho "Installing Havoc"
-
     local dest="${KON_SRC}/Havoc"
-
     if [[ -d "${dest}" ]]; then
         _info "Havoc repo ya existe, eliminando antes de re-clonar"
         rm -rf "${dest}"
@@ -240,13 +119,40 @@ function install_havoc() {
         _ok "git: Havoc → ${dest}"
     else
         _err "git: Havoc (rc=${rc})"
-        echo "----- output -----"; echo "${log}" | tail -20; echo "-------------------"
         return 1
     fi
 
+    apt-get update -y >/dev/null 2>&1
+    for pkg in \
+        build-essential cmake git wget \
+        libssl-dev libz-dev mingw-w64 \
+        nasm python3-dev \
+        qtbase5-dev qt5-qmake qtmultimedia5-dev libqt5websockets5-dev; do
+        install_apt "${pkg}"
+    done
+
     cd "${dest}" || { _err "cd: ${dest}"; return 1; }
 
-    sed -i 's/golang-go//' teamserver/Install.sh
+    if [[ -f teamserver/Install.sh ]]; then
+        sed -i \
+            -e '/golang-go/d' \
+            -e '/go[0-9]\+\.[0-9]/d' \
+            -e '/go\.tar/d' \
+            -e '/curl.*go.*linux/d' \
+            -e '/tar.*go.*tar/d' \
+            teamserver/Install.sh
+        _info "havoc: Install.sh parchado (removidas descargas de Go)"
+    fi
+
+    if [[ -f makefile ]]; then
+        if grep -q '\./go/bin/go\|teamserver/go/bin/go' makefile 2>/dev/null; then
+            sed -i \
+                -e 's|\./go/bin/go|go|g' \
+                -e 's|teamserver/go/bin/go|go|g' \
+                makefile
+            _info "havoc: makefile parchado (go path → sistema)"
+        fi
+    fi
 
     log=$(make ts-build 2>&1)
     rc=$?
@@ -254,23 +160,8 @@ function install_havoc() {
         _ok "make: ts-build"
     else
         _err "make: ts-build (rc=${rc})"
-        echo "----- output -----"; echo "${log}" | tail -40; echo "-------------------"
         return 1
     fi
-
-    # ── Dependencias para el client (Qt5 + CMake) ──
-    # cmake y build-essential no venían instalados en la imagen base,
-    # lo que hacía fallar "make client-build" con "cmake: not found".
-    # qtbase5-dev / qt5-qmake se agregan también porque algunas imágenes
-    # de Debian/Ubuntu no las traen como dependencia transitiva de
-    # qtmultimedia5-dev / libqt5websockets5-dev.
-    apt-get update -y >/dev/null 2>&1
-    install_apt cmake
-    install_apt build-essential
-    install_apt qtbase5-dev
-    install_apt qt5-qmake
-    install_apt qtmultimedia5-dev
-    install_apt libqt5websockets5-dev
 
     log=$(make client-build 2>&1)
     rc=$?
@@ -278,12 +169,6 @@ function install_havoc() {
         _ok "make: client-build"
     else
         _err "make: client-build (rc=${rc})"
-        echo "----- output -----"; echo "${log}" | tail -40; echo "-------------------"
-        if [[ -f "${dest}/client/Build/CMakeFiles/CMakeOutput.log" ]]; then
-            echo "----- CMakeOutput.log (tail) -----"
-            tail -40 "${dest}/client/Build/CMakeFiles/CMakeOutput.log"
-            echo "-----------------------------------"
-        fi
         return 1
     fi
 
@@ -294,7 +179,7 @@ function install_havoc() {
 cd "${dest}" && exec ./havoc "\$@"
 EOF
     chmod +x "${KON_BIN}/havoc"
-    _ok "bin: havoc → ${KON_BIN}/havoc (wrapper, cd a ${dest})"
+    _ok "bin: havoc → ${KON_BIN}/havoc (wrapper)"
 
     if [[ -x "${dest}/havoc" ]] && [[ -x "${KON_BIN}/havoc" ]]; then
         _ok "havoc: instalado correctamente 🎉 (havoc server --profile ...)"
@@ -304,7 +189,6 @@ EOF
 }
 
 function install_sliver() {
-    echo -e "  ${CYAN}bin${RESET} sliver"
     local dest_dir="${KON_SRC}/sliver"
     mkdir -p "${dest_dir}"
     local arch="amd64"
@@ -353,8 +237,6 @@ function install_villain() {
 }
 
 function install_pwncat() {
-    colorecho "Installing pwncat-vl"
-
     _ensure_pipx || return 1
 
     local log rc
@@ -364,9 +246,6 @@ function install_pwncat() {
         _ok "pipx: pwncat-vl"
     else
         _err "pipx: pwncat-vl (rc=${rc})"
-        echo "----- output -----"
-        echo "${log}" | tail -20
-        echo "-------------------"
         return 1
     fi
 
@@ -376,9 +255,6 @@ function install_pwncat() {
         _ok "pipx: inject cryptography==36.0.2"
     else
         _err "pipx: inject cryptography==36.0.2 (rc=${rc})"
-        echo "----- output -----"
-        echo "${log}" | tail -10
-        echo "-------------------"
         return 1
     fi
 
@@ -386,19 +262,35 @@ function install_pwncat() {
         _ok "pwncat-vl: instalado correctamente 🎉"
     else
         _err "pwncat-vl: verificación falló"
-        pwncat-vl --help 2>&1 | tail -15
+    fi
+}
+
+function install_penelope() {
+    _ensure_pipx || return 1
+
+    local log rc
+    log=$(pipx install --system-site-packages penelope-shell-handler 2>&1)
+    rc=$?
+    if [[ ${rc} -eq 0 ]]; then
+        _ok "pipx: penelope-shell-handler"
+    else
+        _err "pipx: penelope-shell-handler (rc=${rc})"
+        return 1
+    fi
+
+    if command -v penelope >/dev/null 2>&1 && penelope --help >/dev/null 2>&1; then
+        _ok "penelope: instalado correctamente 🎉"
+    else
+        _err "penelope: verificación falló"
     fi
 }
 
 function install_metasploit() {
-    echo -e "  ${CYAN}git${RESET} metasploit-framework"
     local dest="${KON_SRC}/metasploit-framework"
 
-    install_apt libpcap-dev
-    install_apt libpq-dev
-    install_apt zlib1g-dev
-    install_apt libsqlite3-dev
-    install_apt postgresql
+    for pkg in libpcap-dev libpq-dev zlib1g-dev libsqlite3-dev postgresql; do
+        install_apt "${pkg}"
+    done
 
     if [[ ! -d "${dest}" ]]; then
         git clone -q --depth 1 \
@@ -415,7 +307,6 @@ function install_metasploit() {
         curl -sSL https://rvm.io/pkuczynski.asc | gpg --import - 2>/dev/null || true
         curl -sSL https://get.rvm.io | bash -s stable >/dev/null 2>&1
     fi
-    # shellcheck disable=SC1091
     [[ -s /etc/profile.d/rvm.sh ]] && source /etc/profile.d/rvm.sh
     [[ -s ~/.rvm/scripts/rvm   ]] && source ~/.rvm/scripts/rvm
 
@@ -460,7 +351,7 @@ WRAPPER
     done
     _ok "git: metasploit → ${KON_BIN}/msfconsole + msfvenom + ..."
 
-    cd /anvil
+    cd /
 }
 
 function install_proxify() {
@@ -471,37 +362,7 @@ function install_goproxy() {
     install_go goproxy github.com/snail007/goproxy@latest
 }
 
-function install_penelope() {
-    # CODE-CHECK-WHITELIST=add-aliases
-    colorecho "Installing Penelope"
-
-    _ensure_pipx || return 1
-
-    local log rc
-    log=$(pipx install --system-site-packages penelope-shell-handler 2>&1)
-    rc=$?
-    if [[ ${rc} -eq 0 ]]; then
-        _ok "pipx: penelope-shell-handler"
-    else
-        _err "pipx: penelope-shell-handler (rc=${rc})"
-        echo "----- output -----"
-        echo "${log}" | tail -20
-        echo "-------------------"
-        return 1
-    fi
-
-    if command -v penelope >/dev/null 2>&1 && penelope --help >/dev/null 2>&1; then
-        _ok "penelope: instalado correctamente 🎉"
-    else
-        _err "penelope: verificación falló"
-        pipx list 2>&1 | grep -A3 -i "penelope" || true
-    fi
-}
-
-function package_infra() {
-    echo ""
-    echo -e "\033[0;36m[*] ┌┬┬ INFRA / C2 ┬┬┐\033[0m"
-
+function p_infra() {
     install_socat
     install_ncat
     install_penelope
@@ -518,6 +379,4 @@ function package_infra() {
 
     install_proxify
     install_goproxy
-
-    echo -e "\033[0;32m[OK]  INFRA package completed${RESET}"
-}
+ }

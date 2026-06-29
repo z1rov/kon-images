@@ -2,97 +2,18 @@
 source /kon/install/common.sh
 mkdir -p /anvil /opt/tools
 
-# ── Helpers extra ───────────────────────────────────────────────────────────
-install_pipx() {
-    pipx install -q --system-site-packages "$2" >/dev/null 2>&1 \
-        && _ok "pipx: $1" || _err "pipx: $1"
-}
-
-# pyvenv python2 — usa el python2.7 real instalado vía pyenv (no 2to3).
-# Uso: pyvenv2_setup <nombre_en_KON_SRC> <script_relativo_dentro_del_repo>
-pyvenv2_setup() {
-    local name="$1" script="$2"
-    local dest="${KON_SRC}/${name}"
-    if [[ ! -d "${dest}" ]]; then _err "pyvenv2: ${name} (src no existe)"; return 1; fi
-    set_python_env
-    local py2_bin
-    py2_bin="$(pyenv root)/versions/2.7.18/bin/python2"
-    if [[ ! -x "${py2_bin}" ]]; then
-        _err "pyvenv2: python2.7.18 no encontrado (corre install_pyenv primero)"
-        return 1
-    fi
-    "${py2_bin}" -m pip install -q --no-cache-dir virtualenv >/dev/null 2>&1
-    "${py2_bin}" -m virtualenv -p "${py2_bin}" "${dest}/venv" >/dev/null 2>&1
-    echo "${dest}/venv"
-}
-
-# venv_pip2 <dest_dir> <paquetes...>
-venv_pip2() {
-    local dest="$1"; shift
-    "${dest}/venv/bin/pip" install -q --no-cache-dir "$@" 2>/dev/null
-}
-
-# Corre un comando, capturando su output. Si falla, lo imprime completo.
-function _run_logged() {
-    local desc="$1"; shift
-    local log rc
-    log=$("$@" 2>&1)
-    rc=$?
-    if [[ ${rc} -eq 0 ]]; then
-        _ok "${desc}"
-    else
-        _err "${desc} (rc=${rc})"
-        echo "----- output -----"
-        echo "${log}"
-        echo "-------------------"
-    fi
-    return ${rc}
-}
-
-# Asegura que pipx esté disponible, probando varias rutas antes de rendirse.
-function _ensure_pipx() {
-    if command -v pipx >/dev/null 2>&1; then
-        return 0
-    fi
-
-    _info "pipx no encontrado, intentando instalar"
-
-    apt-get update -y >/dev/null 2>&1
-    if install_apt pipx && command -v pipx >/dev/null 2>&1; then
-        return 0
-    fi
-
-    _info "apt falló, intentando con pip --user"
-    pip3 install -q --no-cache-dir --user pipx >/dev/null 2>&1
-    export PATH="$HOME/.local/bin:$PATH"
-    if command -v pipx >/dev/null 2>&1; then
-        _ok "pip: pipx (--user)"
-        return 0
-    fi
-
-    _err "pipx: no se pudo instalar por ningún método"
-    return 1
-}
-
-# ── APT base ─────────────────────────────────────────────────────────────────
 function install_web_apt_tools() {
     install_apt dirb
     install_apt prips
     install_apt locales
     install_apt swaks
     echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen && locale-gen >/dev/null 2>&1 || true
-
     install_apt php-cli
-
     install_apt default-jre-headless
-
     install_apt libwww-perl
-
     install_apt python3-pycurl
-
     install_apt cmake
     install_apt build-essential
-
     install_apt libatk1.0-0
     install_apt libgtk-3-0
     install_apt libxcomposite1
@@ -103,12 +24,10 @@ function install_web_apt_tools() {
     install_apt libasound2
     install_apt libatspi2.0-0
     install_apt libxss1
-
     export PATH="${PATH}:/root/.local/bin"
     pipx ensurepath >/dev/null 2>&1 || true
 }
 
-# ── Webshells / fingerprinting ───────────────────────────────────────────────
 function install_weevely() {
     install_apt weevely
 }
@@ -117,26 +36,18 @@ function install_sqlmap() {
     install_apt sqlmap
 }
 
-
 function install_whatweb() {
-    colorecho "Installing WhatWeb"
-
     local dest="${KON_SRC}/whatweb"
     rm -rf "${dest}" 2>/dev/null
     git clone -q --depth 1 https://github.com/urbanadventurer/WhatWeb.git "${dest}" \
         && _ok "git: whatweb → ${dest}" || { _err "git: whatweb"; return 1; }
-
     source /usr/local/rvm/scripts/rvm
     rvm use "${KON_RUBY_VERSION}@whatweb" --create >/dev/null 2>&1
-
     gem install -q addressable json rake >/dev/null 2>&1 \
         && _ok "gem: addressable json rake [gemset:whatweb]" \
         || _err "gem: addressable json rake [gemset:whatweb]"
-
     rvm use "${KON_RUBY_VERSION}@default" >/dev/null 2>&1
-
     chmod +x "${dest}/whatweb"
-
     cat > "${KON_BIN}/whatweb" << EOF
 #!/usr/bin/env bash
 source /usr/local/rvm/scripts/rvm 2>/dev/null
@@ -144,17 +55,15 @@ rvm use ${KON_RUBY_VERSION}@whatweb >/dev/null 2>&1
 exec ruby "${dest}/whatweb" "\$@"
 EOF
     chmod +x "${KON_BIN}/whatweb"
-    _ok "whatweb: wrapper creado en ${KON_BIN}/whatweb"
-
+    _ok "whatweb: wrapper created at ${KON_BIN}/whatweb"
     if "${KON_BIN}/whatweb" --version >/dev/null 2>&1; then
-        _ok "whatweb: instalado correctamente"
+        _ok "whatweb: installed successfully"
     else
-        _err "whatweb: verificación falló"
+        _err "whatweb: verification failed"
         "${KON_BIN}/whatweb" --version 2>&1 | head -10
     fi
 }
 
-# ── Fuzzers / discovery ──────────────────────────────────────────────────────
 function install_kiterunner() {
     install_git kiterunner https://github.com/assetnote/kiterunner.git
     local dest="${KON_SRC}/kiterunner"
@@ -186,7 +95,6 @@ EOF
     fi
 }
 
-# ── SSRF / injection ─────────────────────────────────────────────────────────
 function install_ssrfmap() {
     install_git ssrfmap https://github.com/swisskyrepo/SSRFmap
     local dest="${KON_SRC}/ssrfmap"
@@ -217,7 +125,7 @@ exec "${dest}/venv/bin/python" "${dest}/gopherus.py" "\$@"
 EOF
         chmod +x "${KON_BIN}/gopherus.py"
         ln -sf "${KON_BIN}/gopherus.py" "${KON_BIN}/gopherus"
-        _ok "git: gopherus → ${KON_BIN}/gopherus (python2.7 real)"
+        _ok "git: gopherus → ${KON_BIN}/gopherus (python2.7)"
     fi
 }
 
@@ -238,11 +146,10 @@ exec "${dest}/venv/bin/python" "${dest}/nosqlmap.py" "\$@"
 EOF
         chmod +x "${KON_BIN}/nosqlmap.py"
         ln -sf "${KON_BIN}/nosqlmap.py" "${KON_BIN}/nosqlmap"
-        _ok "git: nosqlmap → ${KON_BIN}/nosqlmap (python2.7 real)"
+        _ok "git: nosqlmap → ${KON_BIN}/nosqlmap (python2.7)"
     fi
 }
 
-# ── XSS ──────────────────────────────────────────────────────────────────────
 function install_xsstrike() {
     install_git xsstrike https://github.com/s0md3v/XSStrike.git
     local dest="${KON_SRC}/xsstrike"
@@ -259,35 +166,6 @@ EOF
         ln -sf "${KON_BIN}/xsstrike.py" "${KON_BIN}/xsstrike"
         _ok "git: xsstrike → ${KON_BIN}/xsstrike"
     fi
-}
-
-function install_xspear() {
-    install_gem xspear XSpear
-}
-
-function install_xsser() {
-    install_git xsser https://github.com/epsylon/xsser.git
-    local dest="${KON_SRC}/xsser"
-    if [[ -d "${dest}" ]]; then
-        python3 -m venv --system-site-packages "${dest}/venv" >/dev/null 2>&1
-        venv_pip "${dest}" bs4 selenium
-        "${dest}/venv/bin/pip" install -q --no-cache-dir pycurl 2>/dev/null || true
-        local xsser_script="${dest}/xsser"
-        [[ ! -f "${xsser_script}" ]] && xsser_script="${dest}/xsser.py"
-        cat > "${KON_BIN}/xsser" << EOF
-#!/usr/bin/env bash
-exec "${dest}/venv/bin/python3" "${xsser_script}" "\$@"
-EOF
-        chmod +x "${KON_BIN}/xsser"
-        _ok "git: xsser → ${KON_BIN}/xsser"
-    fi
-}
-
-# ── CSRF ─────────────────────────────────────────────────────────────────────
-function install_xsrfprobe() {
-    pip3 install -q --no-cache-dir --break-system-packages \
-        "git+https://github.com/0xInfection/XSRFProbe" >/dev/null 2>&1 \
-        && _ok "pip: xsrfprobe" || _err "pip: xsrfprobe"
 }
 
 function install_bolt() {
@@ -307,7 +185,6 @@ EOF
     fi
 }
 
-# ── LFI / upload / login ─────────────────────────────────────────────────────
 function install_kadimus() {
     install_apt libcurl4-openssl-dev
     install_apt libpcre3-dev
@@ -367,7 +244,6 @@ EOF
     fi
 }
 
-# ── CMS scanners ─────────────────────────────────────────────────────────────
 function install_joomscan() {
     install_git joomscan https://github.com/rezasp/joomscan
     local dest="${KON_SRC}/joomscan"
@@ -382,12 +258,8 @@ EOF
 }
 
 function install_wpscan() {
-    colorecho "Installing wpscan"
-
     source /usr/local/rvm/scripts/rvm 2>/dev/null || true
-
     rvm use "${KON_RUBY_VERSION}@wpscan" --create >/dev/null 2>&1
-
     install_apt ruby-dev
     install_apt libxml2-dev
     install_apt libxslt1-dev
@@ -395,14 +267,11 @@ function install_wpscan() {
     install_apt libcurl4-openssl-dev
     install_apt libssl-dev
     install_apt zlib1g-dev
-
     gem install -q bundler >/dev/null 2>&1
-
     gem install -q wpscan >/dev/null 2>&1 \
         && _ok "gem: wpscan [gemset:wpscan]" \
         || {
             _err "gem: wpscan [gemset:wpscan]"
-            colorecho "Intentando instalar wpscan via bundle..."
             git clone -q --depth 1 https://github.com/wpscanteam/wpscan.git /tmp/wpscan-src >/dev/null 2>&1
             (
                 cd /tmp/wpscan-src
@@ -412,9 +281,7 @@ function install_wpscan() {
             )
             rm -rf /tmp/wpscan-src
         }
-
     rvm use "${KON_RUBY_VERSION}@default" >/dev/null 2>&1
-
     cat > "${KON_BIN}/wpscan" << EOF
 #!/usr/bin/env bash
 source /usr/local/rvm/scripts/rvm 2>/dev/null
@@ -422,169 +289,136 @@ rvm use ${KON_RUBY_VERSION}@wpscan >/dev/null 2>&1
 exec wpscan "\$@"
 EOF
     chmod +x "${KON_BIN}/wpscan"
-
     if "${KON_BIN}/wpscan" --help >/dev/null 2>&1; then
-        _ok "wpscan: instalado correctamente → ${KON_BIN}/wpscan"
+        _ok "wpscan: installed successfully → ${KON_BIN}/wpscan"
     else
-        _err "wpscan: verificación falló"
+        _err "wpscan: verification failed"
     fi
 }
 
 function install_droopescan() {
-    colorecho "Installing droopescan"
-
     if command -v pipx >/dev/null 2>&1; then
         pipx install --system-site-packages git+https://github.com/droope/droopescan.git >/dev/null 2>&1 \
             && _ok "pipx: droopescan" || _err "pipx: droopescan"
     else
-        _err "pipx: no disponible"
+        _err "pipx: not available"
     fi
-
     pip3 install -q --no-cache-dir --break-system-packages git+https://github.com/droope/droopescan.git >/dev/null 2>&1 \
         && _ok "pip: droopescan" || {
             _err "pip: droopescan"
             return 1
         }
-
     if command -v droopescan >/dev/null 2>&1; then
-        _ok "droopescan: instalado correctamente"
+        _ok "droopescan: installed successfully"
     else
         local droopescan_bin
         droopescan_bin=$(find /usr/local/bin /root/.local/bin /usr/bin -name "droopescan" 2>/dev/null | head -1)
         if [[ -n "${droopescan_bin}" ]]; then
             ln -sf "${droopescan_bin}" "${KON_BIN}/droopescan"
-            _ok "droopescan: symlink creado → ${KON_BIN}/droopescan"
+            _ok "droopescan: symlink created → ${KON_BIN}/droopescan"
         else
-            _err "droopescan: no se encontró el binario"
+            _err "droopescan: binary not found"
             return 1
         fi
     fi
-
     if droopescan --help >/dev/null 2>&1 || "${KON_BIN}/droopescan" --help >/dev/null 2>&1; then
-        _ok "droopescan: verificación OK"
+        _ok "droopescan: verification OK"
     else
-        _err "droopescan: verificación falló"
+        _err "droopescan: verification failed"
         return 1
     fi
 }
 
 function install_drupwn() {
-    colorecho "Installing drupwn con parche para Python 3.13"
-
     local dest="${KON_SRC}/drupwn"
-
     if [[ ! -d "${dest}" ]]; then
         git clone -q --depth 1 https://github.com/immunIT/drupwn "${dest}" >/dev/null 2>&1 \
             && _ok "git: drupwn → ${dest}" || { _err "git: drupwn"; return 1; }
     else
         _info "skip: drupwn (already exists)"
     fi
-
     if [[ -d "${dest}/venv" ]]; then
         rm -rf "${dest}/venv"
     fi
-
     python3 -m venv "${dest}/venv" >/dev/null 2>&1 \
         && _ok "venv: drupwn" || { _err "venv: drupwn"; return 1; }
-
     "${dest}/venv/bin/pip" install -q --no-cache-dir --upgrade pip >/dev/null 2>&1
     "${dest}/venv/bin/pip" install -q --no-cache-dir setuptools wheel >/dev/null 2>&1 \
         && _ok "pip: setuptools/wheel" || _err "pip: setuptools/wheel"
-
     local site_packages
     site_packages=$("${dest}/venv/bin/python3" -c "import site; print(site.getsitepackages()[0])")
     if [[ ! -d "${site_packages}/pkg_resources" ]]; then
         "${dest}/venv/bin/pip" install -q --no-cache-dir --force-reinstall setuptools >/dev/null 2>&1
-        _info "pkg_resources forzado"
+        _info "pkg_resources forced reinstall"
     fi
-
     while IFS= read -r -d '' init_file; do
         cp "${init_file}" "${init_file}.bak"
         cat > "${init_file}" << 'EOF'
-# Parcheado para Python 3.13: namespace package implicito (PEP 420),
-# no requiere pkg_resources.declare_namespace()
+# Patched for Python 3.13: implicit namespace package (PEP 420),
+# pkg_resources.declare_namespace() not required
 EOF
         _ok "patch: ${init_file#${dest}/}"
     done < <(grep -rlZ "declare_namespace" "${dest}" --include="__init__.py" 2>/dev/null)
-
     local script="${dest}/drupwn"
     if [[ -f "${script}" ]]; then
         sed -i 's|#!/usr/bin/env python|#!/usr/bin/env python3|' "${script}"
         _ok "patch: drupwn shebang"
     fi
-
     cat > "${dest}/requirements-fixed.txt" << 'EOF'
 requests>=2.25.0
 beautifulsoup4>=4.9.0
 lxml>=4.6.0
 colorama>=0.4.0
 EOF
-
     "${dest}/venv/bin/pip" install -q --no-cache-dir -r "${dest}/requirements-fixed.txt" 2>/dev/null \
         && _ok "pip: requirements fixed" || _err "pip: requirements fixed"
-
     (cd "${dest}" && "${dest}/venv/bin/pip" install -q --no-cache-dir -e . 2>/dev/null) \
         && _ok "pip: drupwn (editable)" || _err "pip: drupwn (editable)"
-
     cat > "${KON_BIN}/drupwn" << EOF
 #!/usr/bin/env bash
 export PYTHONPATH="${site_packages}:\$PYTHONPATH"
 exec "${dest}/venv/bin/python3" "${dest}/drupwn" "\$@"
 EOF
     chmod +x "${KON_BIN}/drupwn"
-
     if "${KON_BIN}/drupwn" --help >/dev/null 2>&1; then
-        _ok "drupwn: instalado correctamente"
-        _info "Uso: drupwn --target http://target.com --mode enum"
-        _info "      drupwn --target http://target.com --mode exploit"
+        _ok "drupwn: installed successfully"
+        _info "usage: drupwn --target http://target.com --mode enum"
+        _info "       drupwn --target http://target.com --mode exploit"
     else
-        _err "drupwn: verificación falló"
-        _info "Mostrando error:"
+        _err "drupwn: verification failed"
         "${KON_BIN}/drupwn" --help 2>&1 | head -10
     fi
 }
 
 function install_cmsmap() {
-    # CODE-CHECK-WHITELIST=add-aliases
-    colorecho "Installing CMSmap"
-
     local dest="${KON_SRC}/cmsmap"
-
     if [[ -d "${dest}" ]]; then
-        _info "cmsmap repo ya existe, eliminando antes de re-clonar"
         rm -rf "${dest}"
     fi
     _run_logged "git: cmsmap" git clone -q --depth 1 https://github.com/Dionach/CMSmap.git "${dest}" \
         || return 1
-
     local _p _stale
     IFS=':' read -ra _path_dirs <<< "${PATH}"
     for _p in "${_path_dirs[@]}"; do
         _stale="${_p}/cmsmap"
         if [[ -f "${_stale}" || -L "${_stale}" ]]; then
-            _info "eliminando binario suelto: ${_stale}"
             rm -f "${_stale}"
         fi
     done
     pipx uninstall cmsmap >/dev/null 2>&1
     rm -rf /root/.local/share/pipx/venvs/cmsmap
-
     python3 -m venv "${dest}/venv" \
         && _ok "venv: cmsmap" || { _err "venv: cmsmap"; return 1; }
-
     _run_logged "pip: upgrade pip/setuptools/wheel" \
         "${dest}/venv/bin/pip" install --no-cache-dir --upgrade pip setuptools wheel \
         || return 1
-
     if [[ -f "${dest}/requirements.txt" ]]; then
         _run_logged "pip: requirements.txt" \
             "${dest}/venv/bin/pip" install --no-cache-dir -r "${dest}/requirements.txt"
     fi
-
     _run_logged "pip: cmsmap" \
         "${dest}/venv/bin/pip" install --no-cache-dir "${dest}" \
         || return 1
-
     local venv_py="${dest}/venv/bin/python3"
     if "${venv_py}" -c "from cmsmap.main import main" 2>/dev/null; then
         cat > "${KON_BIN}/cmsmap" << EOF
@@ -592,13 +426,12 @@ function install_cmsmap() {
 exec "${venv_py}" -c "import sys; from cmsmap.main import main; sys.exit(main())" "\$@"
 EOF
         chmod +x "${KON_BIN}/cmsmap"
-        _ok "cmsmap: wrapper creado en ${KON_BIN}/cmsmap"
+        _ok "cmsmap: wrapper created at ${KON_BIN}/cmsmap"
     else
-        _err "cmsmap: el módulo 'cmsmap.main' no es importable en el venv"
+        _err "cmsmap: module 'cmsmap.main' not importable in venv"
         "${venv_py}" -c "from cmsmap.main import main" 2>&1 | sed 's/^/    /'
         return 1
     fi
-
     local conf
     conf=$(compgen -G "${dest}/venv/lib/python3*/site-packages/cmsmap/cmsmap.conf" | head -n1)
     if [[ -n "${conf}" && -f "${conf}" ]]; then
@@ -607,15 +440,13 @@ EOF
         sed -i 's/edbtype = apt/edbtype = git/' "${conf}"
         _ok "patch: cmsmap.conf (${conf})"
     else
-        _err "cmsmap.conf no encontrado, no se pudo parchear"
-        _info "buscando cmsmap.conf en ${dest}:"
+        _err "cmsmap.conf not found, could not patch"
         find "${dest}" -iname "cmsmap.conf" 2>&1
     fi
-
     if "${KON_BIN}/cmsmap" --help >/dev/null 2>&1; then
-        _ok "cmsmap: instalado correctamente"
+        _ok "cmsmap: installed successfully"
     else
-        _err "cmsmap: verificación falló"
+        _err "cmsmap: verification failed"
         "${KON_BIN}/cmsmap" --help 2>&1 | head -10
     fi
 }
@@ -638,7 +469,6 @@ EOF
     fi
 }
 
-# ── SSL/TLS ──────────────────────────────────────────────────────────────────
 function install_testssl() {
     install_apt bsdmainutils
     install_git testssl https://github.com/drwetter/testssl.sh.git
@@ -658,96 +488,74 @@ function install_sslscan() {
         chmod +x "${KON_BIN}/sslscan"
         _ok "bin: sslscan → ${KON_BIN}/sslscan"
     else
-        _err "sslscan: make static falló"
+        _err "sslscan: make static failed"
     fi
     rm -rf "${tmp_dir}"
 }
 
-# ── Recon / discovery ────────────────────────────────────────────────────────
 function install_cloudfail() {
-    colorecho "Installing CloudFail"
-
     local dest="${KON_SRC}/CloudFail"
-
     if [[ -d "${dest}" ]]; then
-        _info "CloudFail repo ya existe, eliminando antes de re-clonar"
         rm -rf "${dest}"
     fi
     _run_logged "git: CloudFail" git clone -q --depth 1 https://github.com/m0rtem/CloudFail "${dest}" \
         || return 1
-
     python3 -m venv "${dest}/venv" \
         && _ok "venv: cloudfail" || { _err "venv: cloudfail"; return 1; }
-
     _run_logged "pip: upgrade pip" \
         "${dest}/venv/bin/pip" install --no-cache-dir --upgrade pip
-
     _run_logged "pip: requirements.txt" \
         "${dest}/venv/bin/pip" install --no-cache-dir -r "${dest}/requirements.txt" \
         || return 1
-
     _run_logged "pip: upgrade urllib3/certifi/chardet" \
         "${dest}/venv/bin/pip" install --no-cache-dir --upgrade urllib3 certifi chardet idna
-
     cat > "${KON_BIN}/cloudfail" << EOF
 #!/usr/bin/env bash
 exec "${dest}/venv/bin/python3" "${dest}/cloudfail.py" "\$@"
 EOF
     chmod +x "${KON_BIN}/cloudfail"
-    _ok "cloudfail: wrapper creado en ${KON_BIN}/cloudfail"
-
+    _ok "cloudfail: wrapper created at ${KON_BIN}/cloudfail"
     if "${KON_BIN}/cloudfail" --help >/dev/null 2>&1; then
-        _ok "cloudfail: instalado correctamente"
+        _ok "cloudfail: installed successfully"
     else
-        _err "cloudfail: verificación falló"
+        _err "cloudfail: verification failed"
         "${KON_BIN}/cloudfail" --help 2>&1 | head -10
     fi
 }
 
 function install_oneforall() {
-    colorecho "Installing OneForAll"
-
     local dest="${KON_SRC}/OneForAll"
-
     if [[ -d "${dest}" ]]; then
-        _info "OneForAll repo ya existe, eliminando antes de re-clonar"
         rm -rf "${dest}"
     fi
-
     _run_logged "git: OneForAll" git clone -q --depth 1 https://github.com/shmilylty/OneForAll.git "${dest}" \
         || return 1
-
     python3 -m venv "${dest}/venv" \
         && _ok "venv: oneforall" || { _err "venv: oneforall"; return 1; }
-
     _run_logged "pip: upgrade pip/setuptools/wheel" \
         "${dest}/venv/bin/pip" install --no-cache-dir --upgrade pip setuptools wheel
-
     _run_logged "pip: requirements.txt" \
         "${dest}/venv/bin/pip" install --no-cache-dir -r "${dest}/requirements.txt" \
         || return 1
-
     local sitepkg
     sitepkg=$("${dest}/venv/bin/python3" -c "import sysconfig; print(sysconfig.get_path('purelib'))")
     cat > "${sitepkg}/pipes.py" << 'EOF'
-"""Shim de compatibilidad: el modulo `pipes` fue removido en Python 3.13.
-python-fire (dependencia de OneForAll) todavia hace `import pipes` y usa
-`pipes.quote`, equivalente a `shlex.quote`."""
+"""Compatibility shim: `pipes` module was removed in Python 3.13.
+python-fire (OneForAll dependency) still does `import pipes` and uses
+`pipes.quote`, which is equivalent to `shlex.quote`."""
 from shlex import quote
 EOF
-    _ok "shim: pipes -> shlex (compat Python 3.13)"
-
+    _ok "shim: pipes -> shlex (Python 3.13 compat)"
     cat > "${KON_BIN}/oneforall" << EOF
 #!/usr/bin/env bash
 cd "${dest}" && exec "${dest}/venv/bin/python3" "${dest}/oneforall.py" "\$@"
 EOF
     chmod +x "${KON_BIN}/oneforall"
-    _ok "oneforall: wrapper creado en ${KON_BIN}/oneforall"
-
+    _ok "oneforall: wrapper created at ${KON_BIN}/oneforall"
     if "${KON_BIN}/oneforall" check >/dev/null 2>&1; then
-        _ok "oneforall: instalado correctamente"
+        _ok "oneforall: installed successfully"
     else
-        _err "oneforall: verificación falló"
+        _err "oneforall: verification failed"
         "${KON_BIN}/oneforall" check 2>&1 | head -10
     fi
 }
@@ -803,12 +611,6 @@ function install_anew() {
     install_go anew github.com/tomnomnom/anew@latest
 }
 
-function install_robotstester() {
-    pip3 install -q --no-cache-dir --break-system-packages \
-        "git+https://github.com/p0dalirius/robotstester" >/dev/null 2>&1 \
-        && _ok "pip: robotstester" || _err "pip: robotstester"
-}
-
 function install_jsluice() {
     install_go jsluice github.com/BishopFox/jsluice/cmd/jsluice@latest
 }
@@ -828,19 +630,9 @@ function install_urldedupe() {
         chmod +x "${KON_BIN}/urldedupe"
         _ok "bin: urldedupe → ${KON_BIN}/urldedupe"
     else
-        _err "urldedupe: make falló"
+        _err "urldedupe: make failed"
     fi
     rm -rf "${tmp_dir}"
-}
-
-# ── Misc / utilidades HTTP ───────────────────────────────────────────────────
-function install_timing_attack() {
-    install_gem timing_attack timing_attack
-}
-
-function install_updog() {
-    pip3 install -q --no-cache-dir --break-system-packages updog >/dev/null 2>&1 \
-        && _ok "pip: updog" || _err "pip: updog"
 }
 
 function install_wuzz() {
@@ -866,7 +658,6 @@ function install_curlie() {
     fi
 }
 
-# ── JWT ──────────────────────────────────────────────────────────────────────
 function install_jwt_tool() {
     install_git jwt_tool https://github.com/ticarpi/jwt_tool
     local dest="${KON_SRC}/jwt_tool"
@@ -893,11 +684,7 @@ EOF
 }
 
 function install_token_exploiter() {
-    # CODE-CHECK-WHITELIST=add-aliases,add-history
-    colorecho "Installing Token Exploiter"
-
     _ensure_pipx || return 1
-
     local log rc
     log=$(pipx install --system-site-packages git+https://github.com/psyray/token-exploiter 2>&1)
     rc=$?
@@ -907,19 +694,17 @@ function install_token_exploiter() {
         _err "pipx: token-exploiter (rc=${rc})"
         echo "----- output -----"
         echo "${log}"
-        echo "-------------------"
+        echo "------------------"
         return 1
     fi
-
     if command -v token-exploiter >/dev/null 2>&1; then
-        _ok "token-exploiter: instalado correctamente"
+        _ok "token-exploiter: installed successfully"
     else
-        _err "token-exploiter: verificación falló (binario no encontrado en PATH)"
+        _err "token-exploiter: binary not found in PATH"
         pipx list 2>&1 | grep -A3 -i "token-exploiter" || true
     fi
 }
 
-# ── Deserialización / RCE ────────────────────────────────────────────────────
 function install_ysoserial() {
     local dest="${KON_SRC}/ysoserial"
     mkdir -p "${dest}"
@@ -978,7 +763,6 @@ EOF
     fi
 }
 
-# ── HTTP methods / smuggling / bypass ───────────────────────────────────────
 function install_httpmethods() {
     install_git httpmethods https://github.com/ShutdownRepo/httpmethods
     local dest="${KON_SRC}/httpmethods"
@@ -1031,7 +815,6 @@ function install_byp4xx() {
     install_go byp4xx github.com/lobuhi/byp4xx@latest
 }
 
-# ── App servers ──────────────────────────────────────────────────────────────
 function install_tomcatwardeployer() {
     install_git tomcatwardeployer https://github.com/mgeeky/tomcatWarDeployer.git
     local dest="${KON_SRC}/tomcatwardeployer"
@@ -1049,24 +832,8 @@ EOF
     fi
 }
 
-# ── Suites de testing de APIs ────────────────────────────────────────────────
-function install_soapui() {
-    local dest="${KON_SRC}/soapui"
-    mkdir -p "${dest}"
-    curl -sL "https://dl.eviware.com/soapuios/5.7.0/SoapUI-5.7.0-linux-bin.tar.gz" \
-        -o /tmp/SoapUI.tar.gz
-    tar -xf /tmp/SoapUI.tar.gz -C "${dest}" --strip-components=1 >/dev/null 2>&1
-    rm -f /tmp/SoapUI.tar.gz
-    link_bin soapui "${dest}/bin/soapui.sh"
-}
-
-# ── Git leaks ────────────────────────────────────────────────────────────────
 function install_git-dumper() {
-    # CODE-CHECK-WHITELIST=add-aliases
-    colorecho "Installing git-dumper"
-
     _ensure_pipx || return 1
-
     local log rc
     log=$(pipx install --system-site-packages git-dumper 2>&1)
     rc=$?
@@ -1076,14 +843,13 @@ function install_git-dumper() {
         _err "pipx: git-dumper (rc=${rc})"
         echo "----- output -----"
         echo "${log}"
-        echo "-------------------"
+        echo "------------------"
         return 1
     fi
-
     if command -v git-dumper >/dev/null 2>&1; then
-        _ok "git-dumper: instalado correctamente"
+        _ok "git-dumper: installed successfully"
     else
-        _err "git-dumper: verificación falló (binario no encontrado en PATH)"
+        _err "git-dumper: binary not found in PATH"
         pipx list 2>&1 | grep -A3 -i "git-dumper" || true
     fi
 }
@@ -1110,7 +876,6 @@ EOF
     _ok "git: gittools → ${KON_BIN}"
 }
 
-# ── XXE ──────────────────────────────────────────────────────────────────────
 function install_xxeinjector() {
     curl -sL https://raw.githubusercontent.com/enjoiz/XXEinjector/refs/heads/master/XXEinjector.rb \
         -o "${KON_BIN}/XXEinjector.rb" \
@@ -1119,13 +884,8 @@ function install_xxeinjector() {
         || _err "bin: XXEinjector"
 }
 
-# ── Recursive scanner ────────────────────────────────────────────────────────
 function install_bbot() {
-    # CODE-CHECK-WHITELIST=add-aliases
-    colorecho "Installing BBOT"
-
     _ensure_pipx || return 1
-
     local log rc
     log=$(pipx install --system-site-packages bbot 2>&1)
     rc=$?
@@ -1135,23 +895,18 @@ function install_bbot() {
         _err "pipx: bbot (rc=${rc})"
         echo "----- output -----"
         echo "${log}"
-        echo "-------------------"
+        echo "------------------"
         return 1
     fi
-
     if command -v bbot >/dev/null 2>&1; then
-        _ok "bbot: instalado correctamente"
+        _ok "bbot: installed successfully"
     else
-        _err "bbot: verificación falló (binario no encontrado en PATH)"
+        _err "bbot: binary not found in PATH"
         pipx list 2>&1 | grep -A3 -i "bbot" || true
     fi
 }
 
-# ── Package runner ───────────────────────────────────────────────────────────
-function package_web() {
-    echo ""
-    echo -e "\033[0;36m[*] ── WEB ──\033[0m"
-
+function p_web() {
     install_rvm
     install_pyenv
     set_env
@@ -1170,10 +925,6 @@ function package_web() {
     install_sqlmap
 
     install_xsstrike
-    install_xspear
-    install_xsser
-
-    install_xsrfprobe
     install_bolt
 
     install_kadimus
@@ -1198,13 +949,10 @@ function package_web() {
     install_gau
     install_hakrevdns
     install_anew
-    install_robotstester
     install_jsluice
     install_subzy
     install_urldedupe
 
-    install_timing_attack
-    install_updog
     install_wuzz
     install_curlie
 
@@ -1231,7 +979,3 @@ function package_web() {
 
     install_bbot
 }
-
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    package_web
-fi
