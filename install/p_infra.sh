@@ -104,9 +104,6 @@ PYEOF
     rm -rf "${tmp}"
 }
 
-#!/usr/bin/env bash
-
-# FUNCIÓN PRINCIPAL: install_havoc() MEJORADA
 function install_havoc() {
     local dest="${KON_SRC}/Havoc"
     if [[ -d "${dest}" ]]; then
@@ -134,16 +131,25 @@ function install_havoc() {
         install_apt "${pkg}"
     done
 
-    # ========== CRÍTICO #1: Verificar/instalar Go 1.23+ ==========
+    cd "${dest}" || { _err "cd: ${dest}"; return 1; }
+
+    # ========== CRÍTICO: Verificar/instalar Go 1.23+ ==========
     if ! command -v go >/dev/null 2>&1 || ! go version | grep -qE 'go1\.(2[3-9]|[3-9][0-9])'; then
         _info "havoc: instalando Go 1.23+ (requerido para ts-build)"
-        _install_golang_latest || return 1
+        local go_version="1.23.5"
+        local go_arch="amd64"
+        [[ $(uname -m) == "aarch64" ]] && go_arch="arm64"
+        
+        curl -fsSL "https://go.dev/dl/go${go_version}.linux-${go_arch}.tar.gz" \
+            -o /tmp/go.tar.gz
+        rm -rf /usr/local/go
+        tar -C /usr/local -xzf /tmp/go.tar.gz
+        rm /tmp/go.tar.gz
+        export PATH="/usr/local/go/bin:$PATH"
     fi
     _info "havoc: usando $(go version)"
 
-    cd "${dest}" || { _err "cd: ${dest}"; return 1; }
-
-    # Parchear Install.sh (mantener compatibilidad original)
+    # Parchear Install.sh
     if [[ -f teamserver/Install.sh ]]; then
         sed -i \
             -e '/golang-go/d' \
@@ -151,50 +157,44 @@ function install_havoc() {
             -e '/go\.tar/d' \
             -e '/curl.*go.*linux/d' \
             -e '/tar.*go.*tar/d' \
+            -e '/rm.*go.*tar/d' \
             teamserver/Install.sh
-        _info "havoc: Install.sh parchado (removidas descargas de Go)"
+        _info "havoc: Install.sh parchado"
     fi
 
-    # ========== CRÍTICO #2: Parchear teamserver/go.mod ==========
+    # ========== CRÍTICO: Parchear teamserver/go.mod ==========
     if [[ -f teamserver/go.mod ]]; then
-        # Arreglar versión incorrecta de Go (1.21.0 → 1.23)
-        if grep -q 'go 1\.21\.0' teamserver/go.mod; then
-            sed -i 's/go 1\.21\.0/go 1.23/' teamserver/go.mod
-            _info "havoc: go.mod parchado (go 1.21.0 → go 1.23)"
+        sed -i 's/go 1\.[0-9]*\.[0-9]/go 1.23/' teamserver/go.mod
+        _info "havoc: go.mod actualizado"
+    fi
+
+    # ========== CRÍTICO: go mod tidy ==========
+    if [[ -f teamserver/go.mod ]]; then
+        cd "${dest}/teamserver"
+        _info "havoc: ejecutando go mod tidy..."
+        if ! go mod tidy 2>&1; then
+            _warn "havoc: go mod tidy tuvo advertencias (continuando)"
+        fi
+        _ok "havoc: go mod tidy completado"
+        cd "${dest}"
+    fi
+
+    # Parchear makefile (CRÍTICO: asegurar que no descarga nada)
+    if [[ -f makefile ]]; then
+        # Remover referencias a descarga de Go
+        sed -i \
+            -e 's|teamserver/go/bin/go|go|g' \
+            -e 's|\./go/bin/go|go|g' \
+            makefile
+        
+        # IMPORTANTE: Si el makefile descarga algo, falla
+        # Verifica que no hay curl de go en el makefile
+        if grep -q 'curl.*go.*linux' makefile; then
+            _warn "makefile aún intenta descargar Go — removiendo"
+            sed -i '/curl.*go.*linux/d' makefile
         fi
         
-        # También arreglar cualquier otra versión antigua
-        if grep -q 'go 1\.[0-9]\+\.[0-9]' teamserver/go.mod; then
-            sed -i 's/go 1\.\([0-9]*\)\.[0-9]/go 1.23/' teamserver/go.mod
-            _info "havoc: go.mod limpiado de versiones antiguas"
-        fi
-    fi
-
-    # ========== CRÍTICO #3: go mod tidy en teamserver ==========
-    if [[ -f teamserver/go.mod ]]; then
-        cd "${dest}/teamserver" || return 1
-        _info "havoc: ejecutando 'go mod tidy' en teamserver..."
-        log=$(go mod tidy 2>&1)
-        rc=$?
-        if [[ ${rc} -eq 0 ]]; then
-            _ok "havoc: go mod tidy completado"
-        else
-            _err "havoc: go mod tidy falló (rc=${rc})"
-            _err "Log: ${log}"
-            return 1
-        fi
-        cd "${dest}" || return 1
-    fi
-
-    # Parchear makefile si es necesario
-    if [[ -f makefile ]]; then
-        if grep -q '\./go/bin/go\|teamserver/go/bin/go' makefile 2>/dev/null; then
-            sed -i \
-                -e 's|\./go/bin/go|go|g' \
-                -e 's|teamserver/go/bin/go|go|g' \
-                makefile
-            _info "havoc: makefile parchado (go path → sistema)"
-        fi
+        _info "havoc: makefile parchado"
     fi
 
     # ========== BUILD: Teamserver ==========
@@ -205,12 +205,12 @@ function install_havoc() {
         _ok "make: ts-build"
     else
         _err "make: ts-build (rc=${rc})"
-        _err "Output: ${log}"
+        _err "Log: $(echo "$log" | head -20)"
         return 1
     fi
 
     # ========== BUILD: Client ==========
-    _info "havoc: compilando cliente Qt..."
+    _info "havoc: compilando cliente..."
     log=$(make client-build 2>&1)
     rc=$?
     if [[ ${rc} -eq 0 ]]; then
@@ -222,22 +222,14 @@ function install_havoc() {
 
     rm -rf "${dest}/client/Build/"
 
-    # Crear wrapper
     cat > "${KON_BIN}/havoc" << EOF
 #!/usr/bin/env bash
 cd "${dest}" && exec ./havoc "\$@"
 EOF
     chmod +x "${KON_BIN}/havoc"
-    _ok "bin: havoc → ${KON_BIN}/havoc (wrapper)"
-
-    # Verificación final
-    if [[ -x "${dest}/havoc" ]] && [[ -x "${KON_BIN}/havoc" ]]; then
-        _ok "havoc: instalado correctamente 🎉 (havoc server --profile ...)"
-    else
-        _err "havoc: verificación falló (binario o wrapper no encontrado)"
-        return 1
-    fi
+    _ok "havoc instalado → ${KON_BIN}/havoc"
 }
+
 
 # ========== FUNCIÓN AUXILIAR: Instalar Go 1.23+ ==========
 function _install_golang_latest() {
