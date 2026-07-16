@@ -1,0 +1,45 @@
+#!/usr/bin/env zsh
+
+# Author: z1rov
+
+export ZSH_DISABLE_COMPFIX=true
+export ZSH="/root/.oh-my-zsh"
+ZSH_THEME=""
+plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
+source "$ZSH/oh-my-zsh.sh"
+
+autoload -Uz vcs_info
+zstyle ':vcs_info:*' enable git
+zstyle ':vcs_info:git:*' formats '%F{yellow} [%b]%f'
+zstyle ':vcs_info:git:*' actionformats '%F{yellow} [%b|%a]%f'
+precmd_functions+=(vcs_info)
+
+PS1="%F{#FF0000}%B[%b%F{#FF0000}%n %F{#FF0000}✘%f%F{#FF0000} %m%F{#FF0000}%B]-%B[%b%F{white}%~%F{#FF0000}%B]%b\${vcs_info_msg_0_}
+%F{#FF0000}%B\$%b%f "
+
+LS_COLORS="di=38;2;255;200;80:fi=38;2;220;220;220:ex=38;2;255;180;60:ln=38;2;120;200;255:so=38;2;180;140;255:bd=38;2;255;120;120:cd=38;2;255;160;80"
+export LS_COLORS
+
+typeset -A ZSH_HIGHLIGHT_STYLES
+ZSH_HIGHLIGHT_STYLES[command]='fg=#00FFFF,bold'
+ZSH_HIGHLIGHT_STYLES[builtin]='fg=#00FFFF,bold'
+ZSH_HIGHLIGHT_STYLES[function]='fg=#00FFFF,bold'
+ZSH_HIGHLIGHT_STYLES[alias]='fg=#00FFFF,bold'
+ZSH_HIGHLIGHT_STYLES[hashed-command]='fg=#00FFFF,bold'
+ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=red,bold'
+
+alias ll='ls -lahF --color=auto'
+alias la='ls -la --color=auto'
+alias ls='ls --color=auto'
+
+alias cd='cd_func() { if [[ $# -eq 0 ]]; then cd /anvil; else builtin cd "$@"; fi; }; cd_func'
+
+HISTSIZE=10000
+SAVEHIST=10000
+setopt INC_APPEND_HISTORY
+
+setopt COMPLETE_IN_WORD
+setopt ALWAYS_TO_END
+unsetopt FLOW_CONTROL
+
+cd /anvil 2>/dev/null
