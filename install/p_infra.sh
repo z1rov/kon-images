@@ -191,12 +191,25 @@ function install_havoc() {
     fi
 
     _info "havoc: building teamserver..."
-    log=$(make ts-build 2>&1)
-    rc=$?
+    local ts_attempt ts_max_attempts=3
+    rc=1
+    for ((ts_attempt=1; ts_attempt<=ts_max_attempts; ts_attempt++)); do
+        log=$(make ts-build 2>&1)
+        rc=$?
+        if [[ ${rc} -eq 0 ]]; then
+            break
+        fi
+        if echo "${log}" | grep -qiE 'gzip: stdin: unexpected end of file|tar: Child returned status|tar: Unexpected EOF'; then
+            _info "havoc: ts-build attempt ${ts_attempt}/${ts_max_attempts} failed (musl.cc mingw toolchain download likely truncated), retrying..."
+            sleep 5
+            continue
+        fi
+        break
+    done
     if [[ ${rc} -eq 0 ]]; then
         _ok "make: ts-build"
     else
-        _err "make: ts-build (rc=${rc})"
+        _err "make: ts-build (rc=${rc}) after ${ts_max_attempts} attempts"
         _err "Log: $(echo "$log" | head -20)"
         return 1
     fi
