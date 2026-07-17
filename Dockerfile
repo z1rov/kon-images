@@ -65,8 +65,8 @@ RUN chmod +x /kon/install/p_ad.sh && apt-get update && bash -c 'source /kon/inst
 COPY install/p_web.sh /kon/install/p_web.sh
 RUN chmod +x /kon/install/p_web.sh && apt-get update && bash -c 'source /kon/install/common.sh && source /kon/install/p_web.sh && p_web' && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-#COPY install/p_infra.sh /kon/install/p_infra.sh
-#RUN chmod +x /kon/install/p_infra.sh && apt-get update && bash -c 'source /kon/install/common.sh && source /kon/install/p_infra.sh && p_infra' && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/p_infra.sh /kon/install/p_infra.sh
+RUN chmod +x /kon/install/p_infra.sh && apt-get update && bash -c 'source /kon/install/common.sh && source /kon/install/p_infra.sh && p_infra' && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY assets/ /kon/assets/
 COPY assets/bin/ /opt/tools/bin/
