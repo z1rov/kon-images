@@ -215,23 +215,19 @@ _run_logged() {
 }
 
 function set_bin_path() {
-    colorecho "Adding ${KON_BIN} to PATH"
     export PATH="${KON_BIN}:$PATH"
 }
 
 function set_cargo_env() {
-    colorecho "Setting cargo environment"
     [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 }
 
 function set_ruby_env() {
-    colorecho "Setting ruby environment"
     source /usr/local/rvm/scripts/rvm
     rvm use "${KON_RUBY_VERSION}@default" >/dev/null 2>&1
 }
 
 function set_python_env() {
-    colorecho "Setting pyenv environment"
     export PYENV_ROOT="$HOME/.pyenv"
     export PATH="${PYENV_ROOT}/bin:$PATH"
     eval "$(pyenv init --path)"
@@ -239,7 +235,6 @@ function set_python_env() {
 }
 
 function set_env() {
-    colorecho "Setting env (caller)"
     set_bin_path
     set_cargo_env
     set_ruby_env
@@ -247,7 +242,6 @@ function set_env() {
 }
 
 function install_rvm() {
-    colorecho "Installing RVM (Ruby Version Manager)"
     install_apt gnupg2
     install_apt curl
 
@@ -261,7 +255,6 @@ function install_rvm() {
 
     source /usr/local/rvm/scripts/rvm
 
-    colorecho "Installing ruby ${KON_RUBY_VERSION} (default gemset)"
     rvm install "${KON_RUBY_VERSION}" >/dev/null 2>&1 \
         && _ok "rvm: ruby ${KON_RUBY_VERSION}" || _err "rvm: ruby ${KON_RUBY_VERSION}"
     rvm use "${KON_RUBY_VERSION}@default" --create >/dev/null 2>&1
@@ -270,7 +263,6 @@ function install_rvm() {
 }
 
 function install_pyenv() {
-    colorecho "Installing pyenv"
     install_apt git
     install_apt curl
     install_apt build-essential
@@ -282,7 +274,6 @@ function install_pyenv() {
 
     set_python_env
 
-    colorecho "Installing build deps for python2/python3 compilation"
     install_apt libssl-dev
     install_apt zlib1g-dev
     install_apt libbz2-dev
@@ -295,7 +286,6 @@ function install_pyenv() {
 
     local v
     for v in $PYTHON_VERSIONS; do
-        colorecho "Installing python${v}"
         pyenv install -s "$v" >/dev/null 2>&1 \
             && _ok "pyenv: python${v}" || _err "pyenv: python${v}"
     done
