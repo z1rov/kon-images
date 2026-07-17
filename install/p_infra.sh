@@ -461,6 +461,13 @@ function install_netexec() {
         _err "pipx: netexec (see pipx output above)"
         return 1
     fi
+
+    pip3 uninstall -y oscrypto >/dev/null 2>&1 || true
+    pip3 install -q --no-cache-dir --break-system-packages --force-reinstall --no-deps \
+        "git+https://github.com/wbond/oscrypto.git" >/dev/null 2>&1 \
+        && _ok "pip: oscrypto (fix libcrypto, from git, system-wide for nxc)" \
+        || _err "pip: oscrypto (fix libcrypto, from git, system-wide for nxc)"
+
     local pipx_bin="${HOME}/.local/bin/nxc"
     if [[ -f "${pipx_bin}" ]]; then
         ln -sf "${pipx_bin}" "${KON_BIN}/nxc"
@@ -469,6 +476,14 @@ function install_netexec() {
         _err "netexec: nxc binary not found at ${pipx_bin} after pipx install"
         return 1
     fi
+
+    if "${KON_BIN}/nxc" --help >/tmp/nxc_check.log 2>&1; then
+        _ok "nxc: verification OK"
+    else
+        _err "nxc: verification failed (check libcrypto/oscrypto)"
+        sed 's/^/         /' /tmp/nxc_check.log
+    fi
+    rm -f /tmp/nxc_check.log
 }
 
 
