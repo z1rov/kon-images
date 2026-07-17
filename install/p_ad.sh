@@ -131,33 +131,6 @@ function install_roadrecon() {
     install_pip roadrecon || _info "note: roadrecon may have broken/frozen deps on current pip/python"
 }
 
-function install_netexec() {
-    local NXC_DIR="${KON_SRC}/NetExec"
-    install_rust || { _err "netexec: aborting, rust toolchain required to build aardwolf"; return 1; }
-    [[ -f "${HOME}/.cargo/env" ]] && source "${HOME}/.cargo/env"
-    if [[ -d "${NXC_DIR}" ]]; then
-        _info "skip: netexec (already exists)"
-    else
-        git clone -q --depth 1 https://github.com/Pennyw0rth/NetExec "${NXC_DIR}" >/dev/null 2>&1 || { _err "git: netexec"; return 1; }
-    fi
-    pipx ensurepath >/dev/null 2>&1
-    export PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
-    if pipx install --system-site-packages --force "${NXC_DIR}"; then
-        _ok "pipx: netexec"
-    else
-        _err "pipx: netexec (see pipx output above)"
-        return 1
-    fi
-    local pipx_bin="${HOME}/.local/bin/nxc"
-    if [[ -f "${pipx_bin}" ]]; then
-        ln -sf "${pipx_bin}" "${KON_BIN}/nxc"
-        _ok "bin: nxc → ${KON_BIN}/nxc"
-    else
-        _err "netexec: nxc binary not found at ${pipx_bin} after pipx install"
-        return 1
-    fi
-}
-
 function install_manspider() {
     install_git manspider https://github.com/blacklanternsecurity/MANSPIDER
     pip3 install -q --no-cache-dir --break-system-packages "${KON_SRC}/manspider" >/dev/null 2>&1 && _ok "pip: manspider" || _err "pip: manspider"
@@ -439,7 +412,6 @@ function p_ad() {
     install_gpp_decrypt
     install_pcredz
     install_roadrecon
-    install_netexec
     install_powerview_py
     install_pywerview
     install_responder

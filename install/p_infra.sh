@@ -493,8 +493,6 @@ function p_infra() {
     install_ncat
     install_penelope
     install_sshuttle
-    install_nxc 
-
     install_chisel
     install_ligolo
 
@@ -506,4 +504,5 @@ function p_infra() {
 
     install_proxify
     install_goproxy
- }
+    install_netexec 
+}
