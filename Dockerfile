@@ -59,6 +59,15 @@ RUN chmod +x /kon/install/p_wordlists.sh && apt-get update && bash -c 'source /k
 COPY install/p_binaries.sh /kon/install/p_binaries.sh
 RUN chmod +x /kon/install/p_binaries.sh && apt-get update && bash -c 'source /kon/install/common.sh && source /kon/install/p_binaries.sh && p_binaries' && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+COPY install/p_ad.sh /kon/install/p_ad.sh
+RUN chmod +x /kon/install/p_ad.sh && apt-get update && bash -c 'source /kon/install/common.sh && source /kon/install/p_ad.sh && p_ad' && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY install/p_web.sh /kon/install/p_web.sh
+RUN chmod +x /kon/install/p_web.sh && apt-get update && bash -c 'source /kon/install/common.sh && source /kon/install/p_web.sh && p_web' && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY install/p_infra.sh /kon/install/p_infra.sh
+RUN chmod +x /kon/install/p_infra.sh && apt-get update && bash -c 'source /kon/install/common.sh && source /kon/install/p_infra.sh && p_infra' && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 COPY assets/ /kon/assets/
 COPY assets/bin/ /opt/tools/bin/
 RUN chmod +x /opt/tools/bin/*
