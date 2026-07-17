@@ -462,11 +462,11 @@ function install_netexec() {
         return 1
     fi
 
-    pip3 uninstall -y oscrypto >/dev/null 2>&1 || true
-    pip3 install -q --no-cache-dir --break-system-packages --force-reinstall --no-deps \
+    pip3 uninstall -y oscrypto --break-system-packages >/dev/null 2>&1 || true
+    pipx runpip netexec install --force-reinstall --no-deps \
         "git+https://github.com/wbond/oscrypto.git" >/dev/null 2>&1 \
-        && _ok "pip: oscrypto (fix libcrypto, from git, system-wide for nxc)" \
-        || _err "pip: oscrypto (fix libcrypto, from git, system-wide for nxc)"
+        && _ok "pipx: oscrypto (fix libcrypto, from git, injected into netexec venv)" \
+        || _err "pipx: oscrypto (fix libcrypto, from git, injected into netexec venv)"
 
     local pipx_bin="${HOME}/.local/bin/nxc"
     if [[ -f "${pipx_bin}" ]]; then
