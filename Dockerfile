@@ -1,8 +1,10 @@
+# Author: z1rov
+
 FROM debian:bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    KON_HOME=/kon \
-    KON_ANVIL=/anvil \
+    Z1_HOME=/z1 \
+    Z1_ANVIL=/anvil \
     TERM=xterm-256color \
     SHELL=/bin/bash \
     LANG=en_US.UTF-8 \
@@ -47,42 +49,42 @@ RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master
     git clone https://github.com/zsh-users/zsh-syntax-highlighting.git \
         ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
 
-COPY install/common.sh /kon/install/common.sh
-RUN chmod +x /kon/install/common.sh
+COPY install/common.sh /z1/install/common.sh
+RUN chmod +x /z1/install/common.sh
 
-COPY install/p_recon.sh /kon/install/p_recon.sh
-RUN chmod +x /kon/install/p_recon.sh && apt-get update && bash -c 'source /kon/install/common.sh && source /kon/install/p_recon.sh && p_recon' && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/p_recon.sh /z1/install/p_recon.sh
+RUN chmod +x /z1/install/p_recon.sh && apt-get update && bash -c 'source /z1/install/common.sh && source /z1/install/p_recon.sh && p_recon' && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY install/p_wordlists.sh /kon/install/p_wordlists.sh
-RUN chmod +x /kon/install/p_wordlists.sh && apt-get update && bash -c 'source /kon/install/common.sh && source /kon/install/p_wordlists.sh && p_wordlists' && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/p_wordlists.sh /z1/install/p_wordlists.sh
+RUN chmod +x /z1/install/p_wordlists.sh && apt-get update && bash -c 'source /z1/install/common.sh && source /z1/install/p_wordlists.sh && p_wordlists' && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY install/p_binaries.sh /kon/install/p_binaries.sh
-RUN chmod +x /kon/install/p_binaries.sh && apt-get update && bash -c 'source /kon/install/common.sh && source /kon/install/p_binaries.sh && p_binaries' && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/p_binaries.sh /z1/install/p_binaries.sh
+RUN chmod +x /z1/install/p_binaries.sh && apt-get update && bash -c 'source /z1/install/common.sh && source /z1/install/p_binaries.sh && p_binaries' && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY install/p_ad.sh /kon/install/p_ad.sh
-RUN chmod +x /kon/install/p_ad.sh && apt-get update && bash -c 'source /kon/install/common.sh && source /kon/install/p_ad.sh && p_ad' && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/p_ad.sh /z1/install/p_ad.sh
+RUN chmod +x /z1/install/p_ad.sh && apt-get update && bash -c 'source /z1/install/common.sh && source /z1/install/p_ad.sh && p_ad' && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY install/p_web.sh /kon/install/p_web.sh
-RUN chmod +x /kon/install/p_web.sh && apt-get update && bash -c 'source /kon/install/common.sh && source /kon/install/p_web.sh && p_web' && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/p_web.sh /z1/install/p_web.sh
+RUN chmod +x /z1/install/p_web.sh && apt-get update && bash -c 'source /z1/install/common.sh && source /z1/install/p_web.sh && p_web' && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY install/p_infra.sh /kon/install/p_infra.sh
-RUN chmod +x /kon/install/p_infra.sh && apt-get update && bash -c 'source /kon/install/common.sh && source /kon/install/p_infra.sh && p_infra' && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY install/p_infra.sh /z1/install/p_infra.sh
+RUN chmod +x /z1/install/p_infra.sh && apt-get update && bash -c 'source /z1/install/common.sh && source /z1/install/p_infra.sh && p_infra' && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY assets/ /kon/assets/
+COPY assets/ /z1/assets/
 COPY assets/bin/ /opt/tools/bin/
 RUN chmod +x /opt/tools/bin/*
 
-COPY version/ /kon/version/
+COPY version/ /z1/version/
 
-COPY runtime/ /kon/runtime/
-COPY assets/zshrc-kon /root/.zshrc
+COPY runtime/ /z1/runtime/
+COPY assets/zshrc-z1 /root/.zshrc
 ENV PATH="${PATH}:/root/.local/bin"
 
-RUN find /kon -name "*.sh" -exec chmod +x {} \; && \
+RUN find /z1 -name "*.sh" -exec chmod +x {} \; && \
     mkdir -p /anvil /opt/tools/bin /opt/tools/src /opt/tools/forja \
              /usr/share/rules
 
 RUN updatedb
 
 WORKDIR /anvil
-ENTRYPOINT ["/kon/runtime/init.sh"]
+ENTRYPOINT ["/z1/runtime/init.sh"]

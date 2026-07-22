@@ -1,3 +1,4 @@
+# Author: z1rov
 name: build-and-push
 
 on:
@@ -39,8 +40,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/kon-image:latest
-            ghcr.io/${{ github.repository }}/kon-image:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/z1-images:latest
+            ghcr.io/${{ github.repository }}/z1-images:${{ github.sha }}
           cache-from: type=gha,scope=${{ github.workflow }}
           cache-to: type=gha,scope=${{ github.workflow }},mode=max
           build-args: |

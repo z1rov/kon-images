@@ -3,15 +3,15 @@
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; CYAN='\033[0;36m'; DIM='\033[2m'; RESET='\033[0m'
 
-KON_TOOLS="/opt/tools"
-KON_BIN="${KON_TOOLS}/bin"
-KON_SRC="${KON_TOOLS}/src"
-KON_FORJA="${KON_TOOLS}/forja"
+Z1_TOOLS="/opt/tools"
+Z1_BIN="${Z1_TOOLS}/bin"
+Z1_SRC="${Z1_TOOLS}/src"
+Z1_FORJA="${Z1_TOOLS}/forja"
 
-KON_RUBY_VERSION="3.2.2"
+Z1_RUBY_VERSION="3.2.2"
 PYTHON_VERSIONS="2.7.18 3.13.2"
 
-mkdir -p "${KON_BIN}" "${KON_SRC}" "${KON_FORJA}"
+mkdir -p "${Z1_BIN}" "${Z1_SRC}" "${Z1_FORJA}"
 
 _ok()       { echo -e "  ${GREEN}[OK]${RESET}    ${DIM}$1${RESET}"; }
 _err()      { echo -e "  ${RED}[ERROR]${RESET} $1"; }
@@ -31,13 +31,13 @@ install_go() {
     go install "$2" >/dev/null 2>&1 || { _err "go:  $1"; return 1; }
     local gobin="${GOPATH:-/root/go}/bin/$1"
     if [[ -f "${gobin}" ]]; then
-        ln -sf "${gobin}" "${KON_BIN}/$1"
+        ln -sf "${gobin}" "${Z1_BIN}/$1"
     fi
-    _ok "go:  $1 → ${KON_BIN}/$1"
+    _ok "go:  $1 → ${Z1_BIN}/$1"
 }
 
 install_git() {
-    local dest="${KON_SRC}/$1"
+    local dest="${Z1_SRC}/$1"
     if [[ -d "${dest}" ]]; then
         _info "skip: $1 (already exists)"
         return
@@ -49,7 +49,7 @@ install_git() {
 install_gem() {
     local gemset="$1" pkg="$2" version="${3:-}"
     source /usr/local/rvm/scripts/rvm
-    rvm use "${KON_RUBY_VERSION}@${gemset}" --create >/dev/null 2>&1
+    rvm use "${Z1_RUBY_VERSION}@${gemset}" --create >/dev/null 2>&1
     if [[ -n "${version}" ]]; then
         gem install -q "${pkg}" -v "${version}" >/dev/null 2>&1 \
             && _ok "gem: ${pkg} (${version}) [gemset:${gemset}]" \
@@ -59,7 +59,7 @@ install_gem() {
             && _ok "gem: ${pkg} [gemset:${gemset}]" \
             || _err "gem: ${pkg} [gemset:${gemset}]"
     fi
-    rvm use "${KON_RUBY_VERSION}@default" >/dev/null 2>&1
+    rvm use "${Z1_RUBY_VERSION}@default" >/dev/null 2>&1
 }
 
 install_pipx() {
@@ -70,9 +70,9 @@ install_pipx() {
 link_bin() {
     local name="$1" target="$2"
     if [[ -f "${target}" ]]; then
-        ln -sf "${target}" "${KON_BIN}/${name}"
+        ln -sf "${target}" "${Z1_BIN}/${name}"
         chmod +x "${target}" 2>/dev/null || true
-        _ok "bin: ${name} → ${KON_BIN}/${name}"
+        _ok "bin: ${name} → ${Z1_BIN}/${name}"
     else
         _err "link_bin: ${target} does not exist"
     fi
@@ -80,7 +80,7 @@ link_bin() {
 
 forja_get() {
     local grupo="$1" url="$2" fname="${3:-$(basename "$url")}"
-    local dest_dir="${KON_FORJA}/${grupo}"
+    local dest_dir="${Z1_FORJA}/${grupo}"
     mkdir -p "${dest_dir}"
     curl -sL "${url}" -o "${dest_dir}/${fname}" \
         && _ok "forja: ${grupo}/${fname}" || _err "forja: ${grupo}/${fname}"
@@ -99,7 +99,7 @@ venv_pip2() {
 
 pyvenv2_setup() {
     local name="$1" script="$2"
-    local dest="${KON_SRC}/${name}"
+    local dest="${Z1_SRC}/${name}"
     if [[ ! -d "${dest}" ]]; then _err "pyvenv2: ${name} (src does not exist)"; return 1; fi
     set_python_env
     local py2_bin
@@ -215,7 +215,7 @@ _run_logged() {
 }
 
 function set_bin_path() {
-    export PATH="${KON_BIN}:$PATH"
+    export PATH="${Z1_BIN}:$PATH"
 }
 
 function set_cargo_env() {
@@ -224,7 +224,7 @@ function set_cargo_env() {
 
 function set_ruby_env() {
     source /usr/local/rvm/scripts/rvm
-    rvm use "${KON_RUBY_VERSION}@default" >/dev/null 2>&1
+    rvm use "${Z1_RUBY_VERSION}@default" >/dev/null 2>&1
 }
 
 function set_python_env() {
@@ -255,9 +255,9 @@ function install_rvm() {
 
     source /usr/local/rvm/scripts/rvm
 
-    rvm install "${KON_RUBY_VERSION}" >/dev/null 2>&1 \
-        && _ok "rvm: ruby ${KON_RUBY_VERSION}" || _err "rvm: ruby ${KON_RUBY_VERSION}"
-    rvm use "${KON_RUBY_VERSION}@default" --create >/dev/null 2>&1
+    rvm install "${Z1_RUBY_VERSION}" >/dev/null 2>&1 \
+        && _ok "rvm: ruby ${Z1_RUBY_VERSION}" || _err "rvm: ruby ${Z1_RUBY_VERSION}"
+    rvm use "${Z1_RUBY_VERSION}@default" --create >/dev/null 2>&1
 
     rvm cleanup all >/dev/null 2>&1 || true
 }

@@ -2,14 +2,14 @@
 
 # Author: z1rov
 
-KON_HOME="/kon"
+Z1_HOME="/z1"
 
-if [[ -f "${KON_HOME}/runtime/workspace.sh" ]]; then
-    source "${KON_HOME}/runtime/workspace.sh" || true
+if [[ -f "${Z1_HOME}/runtime/workspace.sh" ]]; then
+    source "${Z1_HOME}/runtime/workspace.sh" || true
 fi
 
-if [[ -f "${KON_HOME}/assets/zshrc-kon" ]]; then
-    cp "${KON_HOME}/assets/zshrc-kon" /root/.zshrc
+if [[ -f "${Z1_HOME}/assets/zshrc-z1" ]]; then
+    cp "${Z1_HOME}/assets/zshrc-z1" /root/.zshrc
 fi
 
 exec /bin/zsh --login -i

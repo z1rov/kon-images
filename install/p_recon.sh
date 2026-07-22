@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Author: z1rov
 
-source /kon/install/common.sh
+source /z1/install/common.sh
 mkdir -p /opt/tools
 
 install_nmap()      { install_apt nmap; }
@@ -30,7 +30,7 @@ install_wafw00f()   { install_pip wafw00f; }
 install_arjun()     { install_pip arjun; }
 
 function install_feroxbuster() {
-    local dest_dir="${KON_SRC}/feroxbuster"
+    local dest_dir="${Z1_SRC}/feroxbuster"
     mkdir -p "${dest_dir}"
     command -v unzip >/dev/null 2>&1 || install_apt unzip
 
@@ -40,8 +40,8 @@ function install_feroxbuster() {
         curl -sL -o "${dest_dir}/feroxbuster.deb" "${url}"
         dpkg -i "${dest_dir}/feroxbuster.deb" >/dev/null 2>&1 || apt-get -f install -y >/dev/null 2>&1
         if command -v feroxbuster >/dev/null 2>&1; then
-            ln -sf "$(command -v feroxbuster)" "${KON_BIN}/feroxbuster"
-            _ok "deb: feroxbuster → ${KON_BIN}/feroxbuster"
+            ln -sf "$(command -v feroxbuster)" "${Z1_BIN}/feroxbuster"
+            _ok "deb: feroxbuster â†’ ${Z1_BIN}/feroxbuster"
             return
         fi
     fi
@@ -56,8 +56,8 @@ function install_feroxbuster() {
         if [[ -f "${dest_dir}/feroxbuster" ]]; then
             chmod +x "${dest_dir}/feroxbuster"
             if "${dest_dir}/feroxbuster" --version >/dev/null 2>&1; then
-                ln -sf "${dest_dir}/feroxbuster" "${KON_BIN}/feroxbuster"
-                _ok "bin: feroxbuster → ${KON_BIN}/feroxbuster"
+                ln -sf "${dest_dir}/feroxbuster" "${Z1_BIN}/feroxbuster"
+                _ok "bin: feroxbuster â†’ ${Z1_BIN}/feroxbuster"
                 return
             fi
         fi
@@ -67,7 +67,7 @@ function install_feroxbuster() {
 }
 
 function install_rustscan() {
-    local dest_dir="${KON_SRC}/rustscan"
+    local dest_dir="${Z1_SRC}/rustscan"
     mkdir -p "${dest_dir}"
 
     local url
@@ -76,8 +76,8 @@ function install_rustscan() {
         curl -sL -o "${dest_dir}/rustscan.deb" "${url}"
         dpkg -i "${dest_dir}/rustscan.deb" >/dev/null 2>&1 || apt-get -f install -y >/dev/null 2>&1
         if command -v rustscan >/dev/null 2>&1; then
-            ln -sf "$(command -v rustscan)" "${KON_BIN}/rustscan"
-            _ok "deb: rustscan → ${KON_BIN}/rustscan"
+            ln -sf "$(command -v rustscan)" "${Z1_BIN}/rustscan"
+            _ok "deb: rustscan â†’ ${Z1_BIN}/rustscan"
             return
         fi
     fi
@@ -95,8 +95,8 @@ function install_rustscan() {
         if [[ -f "${bin_path}" ]]; then
             chmod +x "${bin_path}"
             if "${bin_path}" --version >/dev/null 2>&1; then
-                ln -sf "${bin_path}" "${KON_BIN}/rustscan"
-                _ok "bin: rustscan → ${KON_BIN}/rustscan"
+                ln -sf "${bin_path}" "${Z1_BIN}/rustscan"
+                _ok "bin: rustscan â†’ ${Z1_BIN}/rustscan"
                 return
             fi
         fi
@@ -114,8 +114,8 @@ function install_rustscan() {
         if [[ -n "${bin_path}" ]]; then
             chmod +x "${bin_path}"
             if "${bin_path}" --version >/dev/null 2>&1; then
-                ln -sf "${bin_path}" "${KON_BIN}/rustscan"
-                _ok "bin: rustscan → ${KON_BIN}/rustscan"
+                ln -sf "${bin_path}" "${Z1_BIN}/rustscan"
+                _ok "bin: rustscan â†’ ${Z1_BIN}/rustscan"
                 return
             fi
         fi
@@ -125,7 +125,7 @@ function install_rustscan() {
 }
 
 function install_nikto() {
-    local dest="${KON_SRC}/nikto"
+    local dest="${Z1_SRC}/nikto"
     if [[ ! -d "${dest}" ]]; then
         git clone -q --depth 1 "https://github.com/sullo/nikto" "${dest}" || { _err "git: nikto (clone failed)"; return; }
     fi
@@ -134,16 +134,16 @@ function install_nikto() {
     cpanm --notest --quiet JSON XML::Writer 2>/dev/null || true
     if [[ -f "${dest}/program/nikto.pl" ]]; then
         chmod +x "${dest}/program/nikto.pl"
-        printf '#!/usr/bin/env bash\nexport LC_ALL=C LANG=C\nexec perl "%s/program/nikto.pl" "$@"\n' "${dest}" > "${KON_BIN}/nikto"
-        chmod +x "${KON_BIN}/nikto"
-        _ok "git: nikto → ${KON_BIN}/nikto"
+        printf '#!/usr/bin/env bash\nexport LC_ALL=C LANG=C\nexec perl "%s/program/nikto.pl" "$@"\n' "${dest}" > "${Z1_BIN}/nikto"
+        chmod +x "${Z1_BIN}/nikto"
+        _ok "git: nikto â†’ ${Z1_BIN}/nikto"
     else
         _err "git: nikto (nikto.pl not found)"
     fi
 }
 
 function install_eyewitness() {
-    local dest="${KON_SRC}/EyeWitness"
+    local dest="${Z1_SRC}/EyeWitness"
     if [[ ! -d "${dest}" ]]; then
         git clone -q --depth 1 "https://github.com/RedSiege/EyeWitness" "${dest}" || { _err "git: EyeWitness (clone failed)"; return; }
     fi
@@ -154,30 +154,30 @@ function install_eyewitness() {
         python3 -c "import ${pkg//-/_}" 2>/dev/null || python3 -m pip install -q --no-cache-dir --break-system-packages "${pkg}" 2>/dev/null || true
     done
     if [[ -f "${dest}/Python/EyeWitness.py" ]]; then
-        printf '#!/usr/bin/env bash\nexec python3 "%s/Python/EyeWitness.py" "$@"\n' "${dest}" > "${KON_BIN}/eyewitness"
-        chmod +x "${KON_BIN}/eyewitness"
-        _ok "git: EyeWitness → ${KON_BIN}/eyewitness"
+        printf '#!/usr/bin/env bash\nexec python3 "%s/Python/EyeWitness.py" "$@"\n' "${dest}" > "${Z1_BIN}/eyewitness"
+        chmod +x "${Z1_BIN}/eyewitness"
+        _ok "git: EyeWitness â†’ ${Z1_BIN}/eyewitness"
     else
         _err "git: EyeWitness (EyeWitness.py not found)"
     fi
 }
 function install_searchsploit() {
-    local dest="${KON_SRC}/exploitdb"
+    local dest="${Z1_SRC}/exploitdb"
 
     if [[ -d "${dest}" ]]; then
         _info "skip: exploitdb (already exists)"
     else
         git clone -q --depth 1 https://gitlab.com/exploit-database/exploitdb.git "${dest}" >/dev/null 2>&1 \
-            && _ok "git: exploitdb → ${dest}" || { _err "git: exploitdb"; return 1; }
+            && _ok "git: exploitdb â†’ ${dest}" || { _err "git: exploitdb"; return 1; }
     fi
 
     if [[ -f "${dest}/searchsploit" ]]; then
         chmod +x "${dest}/searchsploit"
-        ln -sf "${dest}/searchsploit" "${KON_BIN}/searchsploit"
+        ln -sf "${dest}/searchsploit" "${Z1_BIN}/searchsploit"
         if [[ -f "${dest}/.searchsploit_rc" ]]; then
             cp "${dest}/.searchsploit_rc" "${HOME}/.searchsploit_rc"
         fi
-        _ok "git: searchsploit → ${KON_BIN}/searchsploit"
+        _ok "git: searchsploit â†’ ${Z1_BIN}/searchsploit"
     else
         _err "git: searchsploit (binary not found after cloning)"
     fi

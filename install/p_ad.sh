@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Author: z1rov
 
-source /kon/install/common.sh
+source /z1/install/common.sh
 mkdir -p /opt/tools
 
 function install_ad_base() {
@@ -35,7 +35,7 @@ function install_ad_base() {
 }
 
 function install_bloodhound_ce() {
-    local BHD_DIR="${KON_SRC}/bhce-src"
+    local BHD_DIR="${Z1_SRC}/bhce-src"
     if [[ -d "${BHD_DIR}" ]]; then
         _info "skip: bloodhound-ce.py (already exists)"
     else
@@ -43,12 +43,12 @@ function install_bloodhound_ce() {
         python3 -m venv --system-site-packages "${BHD_DIR}/venv" >/dev/null 2>&1
         "${BHD_DIR}/venv/bin/pip3" install -q --no-cache-dir "${BHD_DIR}" >/dev/null 2>&1 || { _err "bloodhound-ce.py: pip install failed"; return 1; }
     fi
-    cat > "${KON_BIN}/bloodhound-ce.py" << WRAPPER
+    cat > "${Z1_BIN}/bloodhound-ce.py" << WRAPPER
 #!/usr/bin/env bash
 exec "${BHD_DIR}/venv/bin/bloodhound-ce-python" "\$@"
 WRAPPER
-    chmod +x "${KON_BIN}/bloodhound-ce.py"
-    _ok "bloodhound-ce.py → ${KON_BIN}/bloodhound-ce.py"
+    chmod +x "${Z1_BIN}/bloodhound-ce.py"
+    _ok "bloodhound-ce.py â†’ ${Z1_BIN}/bloodhound-ce.py"
 }
 
 function install_evil_winrm() {
@@ -56,7 +56,7 @@ function install_evil_winrm() {
 }
 
 function install_john() {
-    local JOHN_DIR="${KON_SRC}/john"
+    local JOHN_DIR="${Z1_SRC}/john"
     local RUN_DIR="${JOHN_DIR}/run"
     if [[ -d "${JOHN_DIR}" ]]; then
         _info "skip: john (already exists)"
@@ -75,33 +75,33 @@ function install_john() {
           make -sj"$(nproc)" >/dev/null 2>&1 || { _err "john: build failed"; exit 1; }
         ) || return 1
     fi
-    cat > "${KON_BIN}/john" << WRAPPER
+    cat > "${Z1_BIN}/john" << WRAPPER
 #!/usr/bin/env bash
 cd "${RUN_DIR}" && exec ./john "\$@"
 WRAPPER
-    chmod +x "${KON_BIN}/john"
+    chmod +x "${Z1_BIN}/john"
     local f base
     for f in "${RUN_DIR}"/*2john* "${RUN_DIR}/unshadow" "${RUN_DIR}/unafs" "${RUN_DIR}/unique"; do
         [[ -f "$f" ]] || continue
         base="$(basename "$f")"
         if [[ "$f" == *.py ]]; then
-            cat > "${KON_BIN}/${base%.py}" << WRAPPER
+            cat > "${Z1_BIN}/${base%.py}" << WRAPPER
 #!/usr/bin/env bash
 cd "${RUN_DIR}" && exec python3 "$f" "\$@"
 WRAPPER
-            chmod +x "${KON_BIN}/${base%.py}"
+            chmod +x "${Z1_BIN}/${base%.py}"
         elif [[ -x "$f" ]]; then
-            cat > "${KON_BIN}/$base" << WRAPPER
+            cat > "${Z1_BIN}/$base" << WRAPPER
 #!/usr/bin/env bash
 cd "${RUN_DIR}" && exec "$f" "\$@"
 WRAPPER
-            chmod +x "${KON_BIN}/$base"
+            chmod +x "${Z1_BIN}/$base"
         fi
     done
-    if "${KON_BIN}/john" --help >/dev/null 2>&1; then
-        _ok "john: installed jumbo (latest from source) → ${KON_BIN}/john"
+    if "${Z1_BIN}/john" --help >/dev/null 2>&1; then
+        _ok "john: installed jumbo (latest from source) â†’ ${Z1_BIN}/john"
     else
-        _err "john: build finished but binary not found in ${KON_BIN}"
+        _err "john: build finished but binary not found in ${Z1_BIN}"
     fi
 }
 
@@ -133,17 +133,17 @@ function install_roadrecon() {
 
 function install_manspider() {
     install_git manspider https://github.com/blacklanternsecurity/MANSPIDER
-    pip3 install -q --no-cache-dir --break-system-packages "${KON_SRC}/manspider" >/dev/null 2>&1 && _ok "pip: manspider" || _err "pip: manspider"
+    pip3 install -q --no-cache-dir --break-system-packages "${Z1_SRC}/manspider" >/dev/null 2>&1 && _ok "pip: manspider" || _err "pip: manspider"
 }
 
 function install_enum4linux_ng() {
     install_git enum4linux-ng https://github.com/cddmp/enum4linux-ng
-    pip3 install -q --no-cache-dir --break-system-packages "${KON_SRC}/enum4linux-ng" >/dev/null 2>&1 && _ok "pip: enum4linux-ng" || _err "pip: enum4linux-ng"
-    link_bin enum4linux-ng "${KON_SRC}/enum4linux-ng/enum4linux-ng.py"
+    pip3 install -q --no-cache-dir --break-system-packages "${Z1_SRC}/enum4linux-ng" >/dev/null 2>&1 && _ok "pip: enum4linux-ng" || _err "pip: enum4linux-ng"
+    link_bin enum4linux-ng "${Z1_SRC}/enum4linux-ng/enum4linux-ng.py"
 }
 
 function install_pcredz() {
-    local PCREDZ_DIR="${KON_SRC}/PCredz"
+    local PCREDZ_DIR="${Z1_SRC}/PCredz"
     install_apt libpcap-dev
     if [[ -d "${PCREDZ_DIR}" ]]; then
         _info "skip: PCredz (already exists)"
@@ -153,13 +153,13 @@ function install_pcredz() {
         "${PCREDZ_DIR}/venv/bin/pip3" install -q --no-cache-dir Cython >/dev/null 2>&1 && _ok "pip: Cython [PCredz venv]" || _err "pip: Cython [PCredz venv]"
         "${PCREDZ_DIR}/venv/bin/pip3" install -q --no-cache-dir pcapy-ng >/dev/null 2>&1 && _ok "pip: pcapy-ng [PCredz venv]" || _err "pip: pcapy-ng [PCredz venv]"
     fi
-    cat > "${KON_BIN}/Pcredz" << WRAPPER
+    cat > "${Z1_BIN}/Pcredz" << WRAPPER
 #!/usr/bin/env bash
 cd "${PCREDZ_DIR}" && exec ./venv/bin/python3 ./Pcredz "\$@"
 WRAPPER
-    chmod +x "${KON_BIN}/Pcredz"
-    if "${KON_BIN}/Pcredz" -h >/dev/null 2>&1; then
-        _ok "Pcredz → ${KON_BIN}/Pcredz"
+    chmod +x "${Z1_BIN}/Pcredz"
+    if "${Z1_BIN}/Pcredz" -h >/dev/null 2>&1; then
+        _ok "Pcredz â†’ ${Z1_BIN}/Pcredz"
     else
         _err "Pcredz: wrapper created but tool failed to run (check venv deps)"
     fi
@@ -167,7 +167,7 @@ WRAPPER
 
 function install_enum4linux() {
     install_git enum4linux https://github.com/CiscoCXSecurity/enum4linux
-    link_bin enum4linux "${KON_SRC}/enum4linux/enum4linux.pl"
+    link_bin enum4linux "${Z1_SRC}/enum4linux/enum4linux.pl"
 }
 
 function install_powerview_py() {
@@ -176,11 +176,11 @@ function install_powerview_py() {
 
 function install_pywerview() {
     install_git pywerview https://github.com/the-useless-one/pywerview
-    pip3 install -q --no-cache-dir --break-system-packages "${KON_SRC}/pywerview" >/dev/null 2>&1 && _ok "git+pip: pywerview" || _err "pip: pywerview"
+    pip3 install -q --no-cache-dir --break-system-packages "${Z1_SRC}/pywerview" >/dev/null 2>&1 && _ok "git+pip: pywerview" || _err "pip: pywerview"
 }
 
 function install_responder() {
-    local RESP_DIR="${KON_SRC}/Responder"
+    local RESP_DIR="${Z1_SRC}/Responder"
     install_apt gcc-mingw-w64-x86-64
     if [[ -d "${RESP_DIR}" ]]; then
         _info "skip: Responder (already exists)"
@@ -198,16 +198,16 @@ function install_responder() {
         x86_64-w64-mingw32-gcc "${RESP_DIR}/tools/MultiRelay/bin/Syssvc.c" -o "${RESP_DIR}/tools/MultiRelay/bin/Syssvc.exe" -municode >/dev/null 2>&1 && _ok "mingw: Syssvc.exe" || _err "mingw: Syssvc.exe"
         "${RESP_DIR}/certs/gen-self-signed-cert.sh" >/dev/null 2>&1 && _ok "Responder: self-signed cert" || _err "Responder: self-signed cert"
     fi
-    cat > "${KON_BIN}/Responder.py" << WRAPPER
+    cat > "${Z1_BIN}/Responder.py" << WRAPPER
 #!/usr/bin/env bash
 cd "${RESP_DIR}" && exec ./venv/bin/python3 ./Responder.py "\$@"
 WRAPPER
-    chmod +x "${KON_BIN}/Responder.py"
-    _ok "Responder.py → ${KON_BIN}/Responder.py"
+    chmod +x "${Z1_BIN}/Responder.py"
+    _ok "Responder.py â†’ ${Z1_BIN}/Responder.py"
 }
 
 function install_petitpotam() {
-    local PP_DIR="${KON_SRC}/PetitPotam"
+    local PP_DIR="${Z1_SRC}/PetitPotam"
     if [[ -d "${PP_DIR}" ]]; then
         _info "skip: PetitPotam (already exists)"
     else
@@ -215,31 +215,31 @@ function install_petitpotam() {
         python3 -m venv --system-site-packages "${PP_DIR}/venv" >/dev/null 2>&1
         "${PP_DIR}/venv/bin/pip3" install -q --no-cache-dir impacket >/dev/null 2>&1 && _ok "pip: impacket [PetitPotam venv]" || _err "pip: impacket [PetitPotam venv]"
     fi
-    cat > "${KON_BIN}/PetitPotam.py" << WRAPPER
+    cat > "${Z1_BIN}/PetitPotam.py" << WRAPPER
 #!/usr/bin/env bash
 cd "${PP_DIR}" && exec ./venv/bin/python3 ./PetitPotam.py "\$@"
 WRAPPER
-    chmod +x "${KON_BIN}/PetitPotam.py"
-    _ok "PetitPotam.py → ${KON_BIN}/PetitPotam.py"
+    chmod +x "${Z1_BIN}/PetitPotam.py"
+    _ok "PetitPotam.py â†’ ${Z1_BIN}/PetitPotam.py"
 }
 
 function install_dfscoerce() {
     install_git DFSCoerce https://github.com/Wh04m1001/DFSCoerce
-    link_bin dfscoerce.py "${KON_SRC}/DFSCoerce/dfscoerce.py"
+    link_bin dfscoerce.py "${Z1_SRC}/DFSCoerce/dfscoerce.py"
 }
 
 function install_shadowcoerce() {
     install_git ShadowCoerce https://github.com/ShutdownRepo/ShadowCoerce
-    link_bin shadowcoerce.py "${KON_SRC}/ShadowCoerce/shadowcoerce.py"
+    link_bin shadowcoerce.py "${Z1_SRC}/ShadowCoerce/shadowcoerce.py"
 }
 
 function install_zerologon() {
     install_git zerologon-scan https://github.com/SecuraBV/CVE-2020-1472
-    link_bin zerologon-scan.py "${KON_SRC}/zerologon-scan/zerologon_tester.py"
+    link_bin zerologon-scan.py "${Z1_SRC}/zerologon-scan/zerologon_tester.py"
 }
 
 function install_noPac() {
-    local NOPAC_DIR="${KON_SRC}/noPac"
+    local NOPAC_DIR="${Z1_SRC}/noPac"
     if [[ -d "${NOPAC_DIR}" ]]; then
         _info "skip: noPac (already exists)"
     else
@@ -247,26 +247,26 @@ function install_noPac() {
         python3 -m venv --system-site-packages "${NOPAC_DIR}/venv" >/dev/null 2>&1
         "${NOPAC_DIR}/venv/bin/pip3" install -q --no-cache-dir -r "${NOPAC_DIR}/requirements.txt" >/dev/null 2>&1 && _ok "pip: noPac requirements [venv]" || _err "pip: noPac requirements [venv]"
     fi
-    cat > "${KON_BIN}/noPac.py" << WRAPPER
+    cat > "${Z1_BIN}/noPac.py" << WRAPPER
 #!/usr/bin/env bash
 cd "${NOPAC_DIR}" && exec ./venv/bin/python3 ./noPac.py "\$@"
 WRAPPER
-    chmod +x "${KON_BIN}/noPac.py"
-    cat > "${KON_BIN}/noPac-scanner.py" << WRAPPER
+    chmod +x "${Z1_BIN}/noPac.py"
+    cat > "${Z1_BIN}/noPac-scanner.py" << WRAPPER
 #!/usr/bin/env bash
 cd "${NOPAC_DIR}" && exec ./venv/bin/python3 ./scanner.py "\$@"
 WRAPPER
-    chmod +x "${KON_BIN}/noPac-scanner.py"
-    _ok "noPac.py → ${KON_BIN}/noPac.py"
-    _ok "noPac-scanner.py → ${KON_BIN}/noPac-scanner.py"
+    chmod +x "${Z1_BIN}/noPac-scanner.py"
+    _ok "noPac.py â†’ ${Z1_BIN}/noPac.py"
+    _ok "noPac-scanner.py â†’ ${Z1_BIN}/noPac-scanner.py"
 }
 
 function install_windapsearch() {
-    local WDS_DIR="${KON_SRC}/windapsearch"
+    local WDS_DIR="${Z1_SRC}/windapsearch"
     install_apt libldap2-dev
     install_apt libsasl2-dev
-    if [[ -L "${KON_BIN}/windapsearch.py" ]]; then
-        rm -f "${KON_BIN}/windapsearch.py"
+    if [[ -L "${Z1_BIN}/windapsearch.py" ]]; then
+        rm -f "${Z1_BIN}/windapsearch.py"
     fi
     if [[ -f "${WDS_DIR}/windapsearch.py" ]] && ! head -1 "${WDS_DIR}/windapsearch.py" | grep -q '^#!/usr/bin/env python'; then
         _info "windapsearch: repo source corrupted by previous run, re-cloning"
@@ -283,14 +283,14 @@ function install_windapsearch() {
             "${WDS_DIR}/venv/bin/pip3" install -q --no-cache-dir python-ldap >/dev/null 2>&1 && _ok "pip: python-ldap [venv]" || _err "pip: python-ldap [venv]"
         fi
     fi
-    rm -f "${KON_BIN}/windapsearch.py"
-    cat > "${KON_BIN}/windapsearch.py" << WRAPPER
+    rm -f "${Z1_BIN}/windapsearch.py"
+    cat > "${Z1_BIN}/windapsearch.py" << WRAPPER
 #!/usr/bin/env bash
 cd "${WDS_DIR}" && exec ./venv/bin/python3 ./windapsearch.py "\$@"
 WRAPPER
-    chmod +x "${KON_BIN}/windapsearch.py"
-    if "${KON_BIN}/windapsearch.py" -h >/tmp/windapsearch_check.log 2>&1; then
-        _ok "windapsearch.py → ${KON_BIN}/windapsearch.py"
+    chmod +x "${Z1_BIN}/windapsearch.py"
+    if "${Z1_BIN}/windapsearch.py" -h >/tmp/windapsearch_check.log 2>&1; then
+        _ok "windapsearch.py â†’ ${Z1_BIN}/windapsearch.py"
     else
         _err "windapsearch.py: wrapper created but tool failed to run"
         _info "output:"
@@ -301,11 +301,11 @@ WRAPPER
 
 function install_targetedkerberoast() {
     install_git targetedKerberoast https://github.com/ShutdownRepo/targetedKerberoast
-    link_bin targetedKerberoast.py "${KON_SRC}/targetedKerberoast/targetedKerberoast.py"
+    link_bin targetedKerberoast.py "${Z1_SRC}/targetedKerberoast/targetedKerberoast.py"
 }
 
 function install_krbrelayx() {
-    local KRB_DIR="${KON_SRC}/krbrelayx"
+    local KRB_DIR="${Z1_SRC}/krbrelayx"
     if [[ -d "${KRB_DIR}" ]]; then
         _info "skip: krbrelayx (already exists)"
     else
@@ -315,17 +315,17 @@ function install_krbrelayx() {
     fi
     local script
     for script in krbrelayx dnstool printerbug addspn; do
-        cat > "${KON_BIN}/${script}.py" << WRAPPER
+        cat > "${Z1_BIN}/${script}.py" << WRAPPER
 #!/usr/bin/env bash
 cd "${KRB_DIR}" && exec ./venv/bin/python3 ./${script}.py "\$@"
 WRAPPER
-        chmod +x "${KON_BIN}/${script}.py"
-        _ok "${script}.py → ${KON_BIN}/${script}.py"
+        chmod +x "${Z1_BIN}/${script}.py"
+        _ok "${script}.py â†’ ${Z1_BIN}/${script}.py"
     done
 }
 
 function install_pkinittools() {
-    local PKT_DIR="${KON_SRC}/PKINITtools"
+    local PKT_DIR="${Z1_SRC}/PKINITtools"
     if [[ -d "${PKT_DIR}" ]]; then
         _info "skip: PKINITtools repo (already exists)"
     else
@@ -336,22 +336,22 @@ function install_pkinittools() {
     fi
     "${PKT_DIR}/venv/bin/pip3" install -q --no-cache-dir -r "${PKT_DIR}/requirements.txt" >/dev/null 2>&1 && _ok "pip: PKINITtools requirements [venv]" || _err "pip: PKINITtools requirements [venv]"
     "${PKT_DIR}/venv/bin/pip3" install -q --no-cache-dir --force-reinstall --no-deps "git+https://github.com/wbond/oscrypto.git" >/dev/null 2>&1 && _ok "pip: oscrypto (fix libcrypto, from git) [venv]" || _err "pip: oscrypto (fix libcrypto, from git) [venv]"
-    rm -f "${KON_BIN}/gettgtpkinit.py" "${KON_BIN}/getnthash.py"
-    cat > "${KON_BIN}/gettgtpkinit.py" << WRAPPER
+    rm -f "${Z1_BIN}/gettgtpkinit.py" "${Z1_BIN}/getnthash.py"
+    cat > "${Z1_BIN}/gettgtpkinit.py" << WRAPPER
 #!/usr/bin/env bash
 cd "${PKT_DIR}" && exec ./venv/bin/python3 ./gettgtpkinit.py "\$@"
 WRAPPER
-    chmod +x "${KON_BIN}/gettgtpkinit.py"
-    cat > "${KON_BIN}/getnthash.py" << WRAPPER
+    chmod +x "${Z1_BIN}/gettgtpkinit.py"
+    cat > "${Z1_BIN}/getnthash.py" << WRAPPER
 #!/usr/bin/env bash
 cd "${PKT_DIR}" && exec ./venv/bin/python3 ./getnthash.py "\$@"
 WRAPPER
-    chmod +x "${KON_BIN}/getnthash.py"
-    _ok "gettgtpkinit.py → ${KON_BIN}/gettgtpkinit.py"
-    _ok "getnthash.py → ${KON_BIN}/getnthash.py"
+    chmod +x "${Z1_BIN}/getnthash.py"
+    _ok "gettgtpkinit.py â†’ ${Z1_BIN}/gettgtpkinit.py"
+    _ok "getnthash.py â†’ ${Z1_BIN}/getnthash.py"
     local test_log="/tmp/pkinittools_check.log"
-    if "${KON_BIN}/gettgtpkinit.py" -h >"${test_log}" 2>&1; then
-        _ok "self-test: gettgtpkinit.py -h → OK (oscrypto import works)"
+    if "${Z1_BIN}/gettgtpkinit.py" -h >"${test_log}" 2>&1; then
+        _ok "self-test: gettgtpkinit.py -h â†’ OK (oscrypto import works)"
     else
         if grep -q "LibraryNotFoundError" "${test_log}"; then
             _err "self-test: gettgtpkinit.py still broken (oscrypto/libcrypto)"
@@ -366,22 +366,22 @@ WRAPPER
 
 function install_pywhisker() {
     install_git pywhisker https://github.com/ShutdownRepo/pywhisker
-    pip3 install -q --no-cache-dir --break-system-packages "${KON_SRC}/pywhisker" >/dev/null 2>&1 && _ok "pip: pywhisker" || _err "pip: pywhisker"
+    pip3 install -q --no-cache-dir --break-system-packages "${Z1_SRC}/pywhisker" >/dev/null 2>&1 && _ok "pip: pywhisker" || _err "pip: pywhisker"
     if [[ -f /usr/local/bin/pywhisker ]]; then
         link_bin pywhisker /usr/local/bin/pywhisker
     else
-        cat > "${KON_BIN}/pywhisker" << WRAPPER
+        cat > "${Z1_BIN}/pywhisker" << WRAPPER
 #!/usr/bin/env bash
 exec python3 -m pywhisker.pywhisker "\$@"
 WRAPPER
-        chmod +x "${KON_BIN}/pywhisker"
-        _ok "bin: pywhisker → ${KON_BIN}/pywhisker (module wrapper)"
+        chmod +x "${Z1_BIN}/pywhisker"
+        _ok "bin: pywhisker â†’ ${Z1_BIN}/pywhisker (module wrapper)"
     fi
 }
 
 function install_gmsadumper() {
     install_git gMSADumper https://github.com/micahvandeusen/gMSADumper
-    link_bin gMSADumper.py "${KON_SRC}/gMSADumper/gMSADumper.py"
+    link_bin gMSADumper.py "${Z1_SRC}/gMSADumper/gMSADumper.py"
 }
 
 function install_kerbrute()      { install_go kerbrute      github.com/ropnop/kerbrute@latest; }

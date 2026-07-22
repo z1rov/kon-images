@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Author: z1rov
 
-source /kon/install/common.sh
+source /z1/install/common.sh
 
 function install_crunch() { install_apt crunch; }
 function install_cupp()   { install_apt cupp; }
@@ -15,7 +15,7 @@ function install_seclists() {
     mkdir -p /usr/share/wordlists
     ln -sf /opt/lists/seclists /usr/share/wordlists/seclists 2>/dev/null || true
     ln -sf /opt/lists/rockyou.txt /usr/share/wordlists/rockyou.txt 2>/dev/null || true
-    _ok "git: seclists → /opt/lists/seclists"
+    _ok "git: seclists â†’ /opt/lists/seclists"
 }
 
 function install_onelistforall() {
@@ -27,7 +27,7 @@ function install_onelistforall() {
 function install_username_anarchy() {
     install_git username-anarchy https://github.com/urbanadventurer/username-anarchy
     ln -sf /opt/tools/src/username-anarchy/username-anarchy /usr/local/bin/username-anarchy 2>/dev/null || true
-    _ok "username-anarchy → /usr/local/bin/username-anarchy"
+    _ok "username-anarchy â†’ /usr/local/bin/username-anarchy"
 }
 
 function install_cewl() {

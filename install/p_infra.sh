@@ -33,10 +33,10 @@ PYEOF
     gunzip -f "${tmp}/chisel_linux.gz" 2>/dev/null
     if [[ -f "${tmp}/chisel_linux" ]]; then
         chmod +x "${tmp}/chisel_linux"
-        cp "${tmp}/chisel_linux" "${KON_BIN}/chisel"
-        _ok "bin: chisel (linux/amd64) → ${KON_BIN}/chisel"
+        cp "${tmp}/chisel_linux" "${Z1_BIN}/chisel"
+        _ok "bin: chisel (linux/amd64) â†’ ${Z1_BIN}/chisel"
     else
-        _err "bin: chisel (linux/amd64) — binary not found"
+        _err "bin: chisel (linux/amd64) â€” binary not found"
     fi
     rm -rf "${tmp}"
 }
@@ -71,17 +71,17 @@ PYEOF
     local url="${base}/ligolo-ng_agent_${version}_linux_amd64.tar.gz"
     curl -sL -o "${tmp}/agent_linux.tar.gz" "${url}"
     if ! tar -tzf "${tmp}/agent_linux.tar.gz" >/dev/null 2>&1; then
-        _err "bin: ligolo-agent — invalid download (${url})"
+        _err "bin: ligolo-agent â€” invalid download (${url})"
     else
         tar -xzf "${tmp}/agent_linux.tar.gz" -C "${tmp}" 2>/dev/null
         local agent_bin
         agent_bin=$(find "${tmp}" -maxdepth 3 -type f -name "agent" 2>/dev/null | head -1)
         if [[ -n "${agent_bin}" ]]; then
             chmod +x "${agent_bin}"
-            cp "${agent_bin}" "${KON_BIN}/ligolo-agent"
-            _ok "bin: ligolo-agent (linux/amd64) → ${KON_BIN}/ligolo-agent"
+            cp "${agent_bin}" "${Z1_BIN}/ligolo-agent"
+            _ok "bin: ligolo-agent (linux/amd64) â†’ ${Z1_BIN}/ligolo-agent"
         else
-            _err "bin: ligolo-agent — binary 'agent' not found after extraction"
+            _err "bin: ligolo-agent â€” binary 'agent' not found after extraction"
         fi
     fi
     rm -rf "${tmp:?}"/*
@@ -89,24 +89,24 @@ PYEOF
     url="${base}/ligolo-ng_proxy_${version}_linux_amd64.tar.gz"
     curl -sL -o "${tmp}/proxy_linux.tar.gz" "${url}"
     if ! tar -tzf "${tmp}/proxy_linux.tar.gz" >/dev/null 2>&1; then
-        _err "bin: ligolo-proxy — invalid download (${url})"
+        _err "bin: ligolo-proxy â€” invalid download (${url})"
     else
         tar -xzf "${tmp}/proxy_linux.tar.gz" -C "${tmp}" 2>/dev/null
         local proxy_bin
         proxy_bin=$(find "${tmp}" -maxdepth 3 -type f -name "proxy" 2>/dev/null | head -1)
         if [[ -n "${proxy_bin}" ]]; then
             chmod +x "${proxy_bin}"
-            cp "${proxy_bin}" "${KON_BIN}/ligolo-proxy"
-            _ok "bin: ligolo-proxy (linux/amd64) → ${KON_BIN}/ligolo-proxy"
+            cp "${proxy_bin}" "${Z1_BIN}/ligolo-proxy"
+            _ok "bin: ligolo-proxy (linux/amd64) â†’ ${Z1_BIN}/ligolo-proxy"
         else
-            _err "bin: ligolo-proxy — binary 'proxy' not found after extraction"
+            _err "bin: ligolo-proxy â€” binary 'proxy' not found after extraction"
         fi
     fi
     rm -rf "${tmp}"
 }
 
 function install_havoc() {
-    local dest="${KON_SRC}/Havoc"
+    local dest="${Z1_SRC}/Havoc"
     if [[ -d "${dest}" ]]; then
         _info "Havoc repo already exists, removing before re-cloning"
         rm -rf "${dest}"
@@ -117,7 +117,7 @@ function install_havoc() {
         https://github.com/HavocFramework/Havoc "${dest}" 2>&1)
     rc=$?
     if [[ ${rc} -eq 0 ]]; then
-        _ok "git: Havoc → ${dest}"
+        _ok "git: Havoc â†’ ${dest}"
     else
         _err "git: Havoc (rc=${rc})"
         return 1
@@ -183,7 +183,7 @@ function install_havoc() {
             makefile
         
         if grep -q 'curl.*go.*linux' makefile; then
-            _warn "makefile still tries to download Go — removing"
+            _warn "makefile still tries to download Go â€” removing"
             sed -i '/curl.*go.*linux/d' makefile
         fi
         
@@ -226,12 +226,12 @@ function install_havoc() {
 
     rm -rf "${dest}/client/Build/"
 
-    cat > "${KON_BIN}/havoc" << EOF
+    cat > "${Z1_BIN}/havoc" << EOF
 #!/usr/bin/env bash
 cd "${dest}" && exec ./havoc "\$@"
 EOF
-    chmod +x "${KON_BIN}/havoc"
-    _ok "havoc installed → ${KON_BIN}/havoc"
+    chmod +x "${Z1_BIN}/havoc"
+    _ok "havoc installed â†’ ${Z1_BIN}/havoc"
 }
 
 
@@ -270,7 +270,7 @@ function _install_golang_latest() {
 }
 
 function install_sliver() {
-    local dest_dir="${KON_SRC}/sliver"
+    local dest_dir="${Z1_SRC}/sliver"
     mkdir -p "${dest_dir}"
     local arch="amd64"
     [[ $(uname -m) == "aarch64" ]] && arch="arm64"
@@ -284,8 +284,8 @@ function install_sliver() {
     if [[ -n "${url_server}" ]]; then
         curl -sL -o "${dest_dir}/sliver-server" "${url_server}"
         chmod +x "${dest_dir}/sliver-server"
-        ln -sf "${dest_dir}/sliver-server" "${KON_BIN}/sliver-server"
-        _ok "bin: sliver-server → ${KON_BIN}/sliver-server"
+        ln -sf "${dest_dir}/sliver-server" "${Z1_BIN}/sliver-server"
+        _ok "bin: sliver-server â†’ ${Z1_BIN}/sliver-server"
     else
         _err "bin: sliver-server"
     fi
@@ -293,15 +293,15 @@ function install_sliver() {
     if [[ -n "${url_client}" ]]; then
         curl -sL -o "${dest_dir}/sliver-client" "${url_client}"
         chmod +x "${dest_dir}/sliver-client"
-        ln -sf "${dest_dir}/sliver-client" "${KON_BIN}/sliver-client"
-        _ok "bin: sliver-client → ${KON_BIN}/sliver-client"
+        ln -sf "${dest_dir}/sliver-client" "${Z1_BIN}/sliver-client"
+        _ok "bin: sliver-client â†’ ${Z1_BIN}/sliver-client"
     else
         _err "bin: sliver-client"
     fi
 }
 
 function install_villain() {
-    local dest="${KON_SRC}/Villain"
+    local dest="${Z1_SRC}/Villain"
     install_git Villain https://github.com/t3l3machus/Villain
     if [[ -f "${dest}/requirements.txt" ]]; then
         python3 -m pip install -q --no-cache-dir --break-system-packages \
@@ -309,9 +309,9 @@ function install_villain() {
     fi
     if [[ -f "${dest}/Villain.py" ]]; then
         printf '#!/usr/bin/env bash\nexec python3 "%s/Villain.py" "$@"\n' \
-            "${dest}" > "${KON_BIN}/villain"
-        chmod +x "${KON_BIN}/villain"
-        _ok "git: Villain → ${KON_BIN}/villain"
+            "${dest}" > "${Z1_BIN}/villain"
+        chmod +x "${Z1_BIN}/villain"
+        _ok "git: Villain â†’ ${Z1_BIN}/villain"
     else
         _err "git: Villain (Villain.py not found)"
     fi
@@ -340,7 +340,7 @@ function install_pwncat() {
     fi
 
     if command -v pwncat-vl >/dev/null 2>&1 && pwncat-vl --help >/dev/null 2>&1; then
-        _ok "pwncat-vl: installed successfully 🎉"
+        _ok "pwncat-vl: installed successfully ðŸŽ‰"
     else
         _err "pwncat-vl: verification failed"
     fi
@@ -360,14 +360,14 @@ function install_penelope() {
     fi
 
     if command -v penelope >/dev/null 2>&1 && penelope --help >/dev/null 2>&1; then
-        _ok "penelope: installed successfully 🎉"
+        _ok "penelope: installed successfully ðŸŽ‰"
     else
         _err "penelope: verification failed"
     fi
 }
 
 function install_metasploit() {
-    local dest="${KON_SRC}/metasploit-framework"
+    local dest="${Z1_SRC}/metasploit-framework"
 
     for pkg in libpcap-dev libpq-dev zlib1g-dev libsqlite3-dev postgresql; do
         install_apt "${pkg}"
@@ -380,8 +380,8 @@ function install_metasploit() {
     fi
 
     cd "${dest}" || return
-    git config user.name "kon"
-    git config user.email "kon@localhost"
+    git config user.name "z1"
+    git config user.email "z1@localhost"
 
     if ! command -v rvm >/dev/null 2>&1; then
         curl -sSL https://rvm.io/mpapis.asc | gpg --import - 2>/dev/null || true
@@ -419,7 +419,7 @@ function install_metasploit() {
 
     for tool in msfconsole msfvenom msfdb msfrpc msfrpcd msfupdate; do
         if [[ -f "${dest}/${tool}" ]]; then
-            cat > "${KON_BIN}/${tool}" << WRAPPER
+            cat > "${Z1_BIN}/${tool}" << WRAPPER
 #!/usr/bin/env bash
 [[ -s /etc/profile.d/rvm.sh ]] && source /etc/profile.d/rvm.sh
 [[ -s ~/.rvm/scripts/rvm   ]] && source ~/.rvm/scripts/rvm
@@ -427,10 +427,10 @@ rvm use 3.3.8@metasploit-framework --quiet 2>/dev/null || true
 cd "${dest}"
 exec "${dest}/${tool}" "\$@"
 WRAPPER
-            chmod +x "${KON_BIN}/${tool}"
+            chmod +x "${Z1_BIN}/${tool}"
         fi
     done
-    _ok "git: metasploit → ${KON_BIN}/msfconsole + msfvenom + ..."
+    _ok "git: metasploit â†’ ${Z1_BIN}/msfconsole + msfvenom + ..."
 
     cd /
 }
@@ -445,7 +445,7 @@ function install_goproxy() {
 
 
 function install_netexec() {
-    local NXC_DIR="${KON_SRC}/NetExec"
+    local NXC_DIR="${Z1_SRC}/NetExec"
     install_rust || { _err "netexec: aborting, rust toolchain required to build aardwolf"; return 1; }
     [[ -f "${HOME}/.cargo/env" ]] && source "${HOME}/.cargo/env"
     if [[ -d "${NXC_DIR}" ]]; then
@@ -470,14 +470,14 @@ function install_netexec() {
 
     local pipx_bin="${HOME}/.local/bin/nxc"
     if [[ -f "${pipx_bin}" ]]; then
-        ln -sf "${pipx_bin}" "${KON_BIN}/nxc"
-        _ok "bin: nxc → ${KON_BIN}/nxc"
+        ln -sf "${pipx_bin}" "${Z1_BIN}/nxc"
+        _ok "bin: nxc â†’ ${Z1_BIN}/nxc"
     else
         _err "netexec: nxc binary not found at ${pipx_bin} after pipx install"
         return 1
     fi
 
-    if "${KON_BIN}/nxc" --help >/tmp/nxc_check.log 2>&1; then
+    if "${Z1_BIN}/nxc" --help >/tmp/nxc_check.log 2>&1; then
         _ok "nxc: verification OK"
     else
         _err "nxc: verification failed (check libcrypto/oscrypto)"

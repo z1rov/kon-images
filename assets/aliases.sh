@@ -19,7 +19,7 @@ alias ll='ls -lahF --color=auto'
 alias la='ls -la --color=auto'
 alias grep='grep --color=auto'
 alias cls='clear'
-alias kon-tools='ls /opt/tools/bin/'
-export PS1='\[\033[0;36m\][KON:] \[\033[1;32m\]\w\[\033[0m\] # '
+alias z1-tools='ls /opt/tools/bin/'
+export PS1='\[\033[0;36m\][Z1:] \[\033[1;32m\]\w\[\033[0m\] # '
 export HOME=/root
 cd /anvil 2>/dev/null || cd /root

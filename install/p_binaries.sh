@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Author: z1rov
-source /kon/install/common.sh
+source /z1/install/common.sh
 mkdir -p /opt/tools
 
 function install_linpeas() {
@@ -16,7 +16,7 @@ function install_linenum() {
 }
 
 function install_pspy() {
-    local forja_dir="${KON_FORJA}/pspy"
+    local forja_dir="${Z1_FORJA}/pspy"
     mkdir -p "${forja_dir}"
     local base_url="https://github.com/DominicBreuker/pspy/releases/latest/download"
     curl -sL -o "${forja_dir}/pspy64" "${base_url}/pspy64" && chmod +x "${forja_dir}/pspy64" || _err "forja: pspy64"
@@ -71,8 +71,8 @@ function install_sharpview() {
 }
 
 function install_sharpshooter() {
-    local dest="${KON_FORJA}/sharpshooter"
-    mkdir -p "${KON_FORJA}"
+    local dest="${Z1_FORJA}/sharpshooter"
+    mkdir -p "${Z1_FORJA}"
     if [[ -d "${dest}" ]]; then
         _info "SharpShooter repo already exists, removing before re-cloning"
         rm -rf "${dest}"
@@ -81,7 +81,7 @@ function install_sharpshooter() {
     log=$(git clone --depth 1 https://github.com/mdsecactivebreach/SharpShooter "${dest}" 2>&1)
     rc=$?
     if [[ ${rc} -eq 0 ]]; then
-        _ok "git: SharpShooter → ${dest}"
+        _ok "git: SharpShooter â†’ ${dest}"
     else
         _err "git: SharpShooter (rc=${rc})"
         return 1
@@ -90,9 +90,9 @@ function install_sharpshooter() {
         python3 -m pip install -q --no-cache-dir --break-system-packages -r "${dest}/requirements.txt" 2>/dev/null || true
     fi
     if [[ -f "${dest}/SharpShooter.py" ]]; then
-        printf '#!/usr/bin/env bash\ncd "%s" && exec python3 SharpShooter.py "$@"\n' "${dest}" > "${KON_BIN}/sharpshooter"
-        chmod +x "${KON_BIN}/sharpshooter"
-        _ok "git: SharpShooter → ${KON_BIN}/sharpshooter (wrapper python3)"
+        printf '#!/usr/bin/env bash\ncd "%s" && exec python3 SharpShooter.py "$@"\n' "${dest}" > "${Z1_BIN}/sharpshooter"
+        chmod +x "${Z1_BIN}/sharpshooter"
+        _ok "git: SharpShooter â†’ ${Z1_BIN}/sharpshooter (wrapper python3)"
     else
         _err "git: SharpShooter (SharpShooter.py not found)"
     fi
@@ -127,7 +127,7 @@ function install_standin() {
 }
 
 function install_adcspwn() {
-    local forja_dir="${KON_FORJA}/adcspwn"
+    local forja_dir="${Z1_FORJA}/adcspwn"
     mkdir -p "${forja_dir}"
     curl -sL -o "${forja_dir}/ADCSPwn.exe" "https://github.com/bats3c/ADCSPwn/releases/download/v1.0/ADCSPwn.exe" && _ok "forja: ADCSPwn" || _err "forja: ADCSPwn"
 }
@@ -145,13 +145,13 @@ function install_sharpdpapi() {
 }
 
 function install_adrecon() {
-    local forja_dir="${KON_FORJA}/adrecon"
+    local forja_dir="${Z1_FORJA}/adrecon"
     mkdir -p "${forja_dir}"
     curl -sL -o "${forja_dir}/ADRecon.ps1" "https://raw.githubusercontent.com/adrecon/ADRecon/master/ADRecon.ps1" && _ok "forja: ADRecon" || _err "forja: ADRecon"
 }
 
 function install_lazagne() {
-    local forja_dir="${KON_FORJA}/lazagne"
+    local forja_dir="${Z1_FORJA}/lazagne"
     mkdir -p "${forja_dir}"
     curl -sL -o "${forja_dir}/lazagne.exe" "https://github.com/AlessandroZ/LaZagne/releases/latest/download/lazagne.exe" && _ok "forja: LaZagne (Windows)" || _err "forja: LaZagne (Windows)"
 }
@@ -161,13 +161,13 @@ function install_safetykatz() {
 }
 
 function install_sqlrecon() {
-    local forja_dir="${KON_FORJA}/sqlrecon"
+    local forja_dir="${Z1_FORJA}/sqlrecon"
     mkdir -p "${forja_dir}"
     curl -sL -o "${forja_dir}/SQLRecon.exe" "https://github.com/skahwah/SQLRecon/releases/latest/download/SQLRecon.exe" && _ok "forja: SQLRecon" || _err "forja: SQLRecon"
 }
 
 function install_powerupsql() {
-    local forja_dir="${KON_FORJA}/powerupsql"
+    local forja_dir="${Z1_FORJA}/powerupsql"
     mkdir -p "${forja_dir}"
     curl -sL -o "${forja_dir}/PowerUpSQL.ps1" "https://raw.githubusercontent.com/NetSPI/PowerUpSQL/master/PowerUpSQL.ps1" && _ok "forja: PowerUpSQL" || _err "forja: PowerUpSQL"
 }
@@ -179,7 +179,7 @@ function install_mimikatz() {
         _err "mimikatz: no release found"
         return
     fi
-    local dest_dir="${KON_FORJA}/mimikatz"
+    local dest_dir="${Z1_FORJA}/mimikatz"
     mkdir -p "${dest_dir}"
     curl -sL -o "${dest_dir}/mimikatz.zip" "${url}" && unzip -oq "${dest_dir}/mimikatz.zip" -d "${dest_dir}" && rm -f "${dest_dir}/mimikatz.zip" && _ok "forja: mimikatz" || _err "forja: mimikatz"
 }
@@ -193,7 +193,7 @@ function install_ghostpack() {
 }
 
 function install_sharphound() {
-    local dest_dir="${KON_FORJA}/sharphound"
+    local dest_dir="${Z1_FORJA}/sharphound"
     mkdir -p "${dest_dir}"
     curl -sL -o "${dest_dir}/sharphound.zip" "https://github.com/SpecterOps/SharpHound/releases/latest/download/SharpHound_v2.13.0_windows_x86.zip"
     if [[ -f "${dest_dir}/sharphound.zip" ]] && [[ -s "${dest_dir}/sharphound.zip" ]]; then
@@ -246,7 +246,7 @@ function install_invoke_obfuscation() {
 }
 
 function install_chisel_win() {
-    local forja_dir="${KON_FORJA}/chisel"
+    local forja_dir="${Z1_FORJA}/chisel"
     mkdir -p "${forja_dir}"
     install_apt unzip
     local version
@@ -276,15 +276,15 @@ PYEOF
     win_bin=$(find "${tmp}/win" -maxdepth 3 -type f -name "*.exe" | head -1)
     if [[ -n "${win_bin}" ]]; then
         cp "${win_bin}" "${forja_dir}/chisel_windows_amd64.exe"
-        _ok "forja: chisel (windows/amd64) → ${forja_dir}/chisel_windows_amd64.exe"
+        _ok "forja: chisel (windows/amd64) â†’ ${forja_dir}/chisel_windows_amd64.exe"
     else
-        _err "forja: chisel (windows/amd64) — exe not found in zip"
+        _err "forja: chisel (windows/amd64) â€” exe not found in zip"
     fi
     rm -rf "${tmp}"
 }
 
 function install_ligolo_win() {
-    local forja_dir="${KON_FORJA}/ligolo"
+    local forja_dir="${Z1_FORJA}/ligolo"
     mkdir -p "${forja_dir}"
     install_apt unzip
     local version
@@ -314,9 +314,9 @@ PYEOF
     agent_win=$(find "${tmp}/agent_win" -maxdepth 3 -type f -name "*.exe" | head -1)
     if [[ -n "${agent_win}" ]]; then
         cp "${agent_win}" "${forja_dir}/ligolo-agent_windows_amd64.exe"
-        _ok "forja: ligolo-agent (windows/amd64) → ${forja_dir}/ligolo-agent_windows_amd64.exe"
+        _ok "forja: ligolo-agent (windows/amd64) â†’ ${forja_dir}/ligolo-agent_windows_amd64.exe"
     else
-        _err "forja: ligolo-agent (windows/amd64) — exe not found in zip"
+        _err "forja: ligolo-agent (windows/amd64) â€” exe not found in zip"
     fi
     rm -rf "${tmp:?}"/*
     curl -sL -o "${tmp}/proxy_windows.zip" "${base}/ligolo-ng_proxy_${version}_windows_amd64.zip"
@@ -326,9 +326,9 @@ PYEOF
     proxy_win=$(find "${tmp}/proxy_win" -maxdepth 3 -type f -name "*.exe" | head -1)
     if [[ -n "${proxy_win}" ]]; then
         cp "${proxy_win}" "${forja_dir}/ligolo-proxy_windows_amd64.exe"
-        _ok "forja: ligolo-proxy (windows/amd64) → ${forja_dir}/ligolo-proxy_windows_amd64.exe"
+        _ok "forja: ligolo-proxy (windows/amd64) â†’ ${forja_dir}/ligolo-proxy_windows_amd64.exe"
     else
-        _err "forja: ligolo-proxy (windows/amd64) — exe not found in zip"
+        _err "forja: ligolo-proxy (windows/amd64) â€” exe not found in zip"
     fi
     rm -rf "${tmp}"
 }
